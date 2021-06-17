@@ -1,0 +1,42 @@
+Performing C SOURCE FILE Test HAVE___DECLSPEC_DLLEXPORT_ failed with the following output:
+Change Dir: /var/www/sites/rth.dk/htdocs/devresources/risearch/RIsearch/RIsearch2/libdivsufsort-2.0.1/build/CMakeFiles/CMakeTmp
+
+Run Build Command:/usr/bin/gmake "cmTryCompileExec212914370/fast"
+/usr/bin/gmake -f CMakeFiles/cmTryCompileExec212914370.dir/build.make CMakeFiles/cmTryCompileExec212914370.dir/build
+gmake[1]: Entering directory `/var/www/sites/rth.dk/htdocs/devresources/risearch/RIsearch/RIsearch2/libdivsufsort-2.0.1/build/CMakeFiles/CMakeTmp'
+/usr/bin/cmake -E cmake_progress_report /var/www/sites/rth.dk/htdocs/devresources/risearch/RIsearch/RIsearch2/libdivsufsort-2.0.1/build/CMakeFiles/CMakeTmp/CMakeFiles 1
+Building C object CMakeFiles/cmTryCompileExec212914370.dir/src.c.o
+/usr/bin/cc   -Wall -fopenmp -DHAVE___DECLSPEC_DLLEXPORT_   -o CMakeFiles/cmTryCompileExec212914370.dir/src.c.o   -c /var/www/sites/rth.dk/htdocs/devresources/risearch/RIsearch/RIsearch2/libdivsufsort-2.0.1/build/CMakeFiles/CMakeTmp/src.c
+/var/www/sites/rth.dk/htdocs/devresources/risearch/RIsearch/RIsearch2/libdivsufsort-2.0.1/build/CMakeFiles/CMakeTmp/src.c:1: warning: return type defaults to ‘int’
+/var/www/sites/rth.dk/htdocs/devresources/risearch/RIsearch/RIsearch2/libdivsufsort-2.0.1/build/CMakeFiles/CMakeTmp/src.c: In function ‘__declspec’:
+/var/www/sites/rth.dk/htdocs/devresources/risearch/RIsearch/RIsearch2/libdivsufsort-2.0.1/build/CMakeFiles/CMakeTmp/src.c:1: error: expected ‘=’, ‘,’, ‘;’, ‘asm’ or ‘__attribute__’ before ‘{’ token
+/var/www/sites/rth.dk/htdocs/devresources/risearch/RIsearch/RIsearch2/libdivsufsort-2.0.1/build/CMakeFiles/CMakeTmp/src.c:1: error: expected ‘=’, ‘,’, ‘;’, ‘asm’ or ‘__attribute__’ before ‘{’ token
+/var/www/sites/rth.dk/htdocs/devresources/risearch/RIsearch/RIsearch2/libdivsufsort-2.0.1/build/CMakeFiles/CMakeTmp/src.c:1: error: declaration for parameter ‘func’ but no such parameter
+/var/www/sites/rth.dk/htdocs/devresources/risearch/RIsearch/RIsearch2/libdivsufsort-2.0.1/build/CMakeFiles/CMakeTmp/src.c:1: error: expected ‘{’ at end of input
+gmake[1]: Leaving directory `/var/www/sites/rth.dk/htdocs/devresources/risearch/RIsearch/RIsearch2/libdivsufsort-2.0.1/build/CMakeFiles/CMakeTmp'
+gmake[1]: *** [CMakeFiles/cmTryCompileExec212914370.dir/src.c.o] Error 1
+gmake: *** [cmTryCompileExec212914370/fast] Error 2
+
+Source file was:
+__declspec(dllexport) void func(); void func() { } int main() { func(); return 0; }
+Performing C SOURCE FILE Test HAVE___DECLSPEC_DLLIMPORT_ failed with the following output:
+Change Dir: /var/www/sites/rth.dk/htdocs/devresources/risearch/RIsearch/RIsearch2/libdivsufsort-2.0.1/build/CMakeFiles/CMakeTmp
+
+Run Build Command:/usr/bin/gmake "cmTryCompileExec4045791139/fast"
+/usr/bin/gmake -f CMakeFiles/cmTryCompileExec4045791139.dir/build.make CMakeFiles/cmTryCompileExec4045791139.dir/build
+gmake[1]: Entering directory `/var/www/sites/rth.dk/htdocs/devresources/risearch/RIsearch/RIsearch2/libdivsufsort-2.0.1/build/CMakeFiles/CMakeTmp'
+/usr/bin/cmake -E cmake_progress_report /var/www/sites/rth.dk/htdocs/devresources/risearch/RIsearch/RIsearch2/libdivsufsort-2.0.1/build/CMakeFiles/CMakeTmp/CMakeFiles 1
+Building C object CMakeFiles/cmTryCompileExec4045791139.dir/src.c.o
+/usr/bin/cc   -Wall -fopenmp -DHAVE___DECLSPEC_DLLIMPORT_   -o CMakeFiles/cmTryCompileExec4045791139.dir/src.c.o   -c /var/www/sites/rth.dk/htdocs/devresources/risearch/RIsearch/RIsearch2/libdivsufsort-2.0.1/build/CMakeFiles/CMakeTmp/src.c
+/var/www/sites/rth.dk/htdocs/devresources/risearch/RIsearch/RIsearch2/libdivsufsort-2.0.1/build/CMakeFiles/CMakeTmp/src.c:1: warning: return type defaults to ‘int’
+/var/www/sites/rth.dk/htdocs/devresources/risearch/RIsearch/RIsearch2/libdivsufsort-2.0.1/build/CMakeFiles/CMakeTmp/src.c: In function ‘__declspec’:
+/var/www/sites/rth.dk/htdocs/devresources/risearch/RIsearch/RIsearch2/libdivsufsort-2.0.1/build/CMakeFiles/CMakeTmp/src.c:1: error: expected ‘=’, ‘,’, ‘;’, ‘asm’ or ‘__attribute__’ before ‘{’ token
+/var/www/sites/rth.dk/htdocs/devresources/risearch/RIsearch/RIsearch2/libdivsufsort-2.0.1/build/CMakeFiles/CMakeTmp/src.c:1: error: expected ‘=’, ‘,’, ‘;’, ‘asm’ or ‘__attribute__’ before ‘{’ token
+/var/www/sites/rth.dk/htdocs/devresources/risearch/RIsearch/RIsearch2/libdivsufsort-2.0.1/build/CMakeFiles/CMakeTmp/src.c:1: error: declaration for parameter ‘func’ but no such parameter
+/var/www/sites/rth.dk/htdocs/devresources/risearch/RIsearch/RIsearch2/libdivsufsort-2.0.1/build/CMakeFiles/CMakeTmp/src.c:1: error: expected ‘{’ at end of input
+gmake[1]: Leaving directory `/var/www/sites/rth.dk/htdocs/devresources/risearch/RIsearch/RIsearch2/libdivsufsort-2.0.1/build/CMakeFiles/CMakeTmp'
+gmake[1]: *** [CMakeFiles/cmTryCompileExec4045791139.dir/src.c.o] Error 1
+gmake: *** [cmTryCompileExec4045791139/fast] Error 2
+
+Source file was:
+__declspec(dllimport) void func(); void func() { } int main() { func(); return 0; }
