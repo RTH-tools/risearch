@@ -68,6 +68,11 @@ Please read the full manuals for RIsearch1 and RIsearch2, included in the instal
 
 Copyright 2021 by the contributors (see RIsearch2/AUTHORS and RIsearch1/README files)
 
+RIsearch1 and Risearch2 are released under the GNU General Public License
+version 3. Note that libdivsufsort is packaged along with RIsearch.
+Libdivsufsort comes with its own authors and copyright under
+RIsearch2/libdivsufsort-2.0.1/{AUTHORS,COPYING}
+
 GNU GENERAL PUBLIC LICENSE
 
 
