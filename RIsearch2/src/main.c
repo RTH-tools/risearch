@@ -83,7 +83,7 @@ saidx64_t *sum_l;
 void usage(const char *cmd)
 {
 	fprintf(stderr, "\n");
-	fprintf(stderr, "================================ RIsearch v%s ===============================\n", version);
+	fprintf(stderr, "================================ RIsearch2 v%s ===============================\n", version);
 	fprintf(stderr, "================ Energy based RNA-RNA interaction predictions ================\n\n");
 	fprintf(stderr, "Usage: %s [options]\n\n", cmd);
 	fprintf(stderr, "  -h,         --help\n");
