@@ -1,6 +1,7 @@
 /***********************************************************
-  RIsearch v 1.3   --   RNA-RNA interaction search
-  Copyright 2012 Anne Wenzel <wenzel@rth.dk>
+  RIsearch v 1.2   --   RNA-RNA interaction search
+  Copyright 2012 Anne Wenzel <wenzel@rth.dk> (RIsearch v.1.0 and v.1.1)
+  Copyright 2021 Giulia I Corsi <giulia@rth.dk> (Extension of RIsearch v.1.1 in RIsearch v.1.2)
 
   This file is part of RIsearch.
 
@@ -461,7 +462,7 @@ char index2nt(unsigned char ix)
 
 void usage(char *progname)
 {
-	fprintf(stderr, "====== RIsearch ver 1.2 ======\n= RNA-RNA interaction search =\n");
+	fprintf(stderr, "====== RIsearch1 ver 1.2 ======\n= RNA-RNA interaction search =\n");
 	fprintf(stderr, "=   Contact: wenzel@rth.dk   =\n==============================\n\n");
 	fprintf(stderr, "Usage: \t%s [ARGUMENTS]\n", progname);
 	fprintf(stderr, "\n   [INPUT]\n");
