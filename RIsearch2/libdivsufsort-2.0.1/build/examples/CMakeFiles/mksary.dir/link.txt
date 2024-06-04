@@ -1,1 +1,0 @@
-/usr/bin/cc   -Wall -fopenmp -O3 -DNDEBUG -fomit-frame-pointer    CMakeFiles/mksary.dir/mksary.o  -o mksary  -L/var/www/sites/rth.dk/htdocs/devresources/risearch/RIsearch/RIsearch2/libdivsufsort-2.0.1/build/examples/../lib -rdynamic ../lib/libdivsufsort.a -Wl,-rpath,/var/www/sites/rth.dk/htdocs/devresources/risearch/RIsearch/RIsearch2/libdivsufsort-2.0.1/build/examples/../lib 
