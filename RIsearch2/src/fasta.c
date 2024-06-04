@@ -123,7 +123,7 @@ int fasta_read(fasta_t *ffp, char **ret_seq, char **ret_name, saidx64_t *ret_L)
 	 * sequence length.
 	 */
 	seq = malloc(sizeof(char) * FALLOC);   /* allocate seq in blocks of residues */
-	if (name == NULL) {
+	if (seq == NULL) {
 		fprintf(stderr, "Failed allocation in fasta read.\n");
 		abort();
 	}
@@ -151,6 +151,12 @@ int fasta_read(fasta_t *ffp, char **ret_seq, char **ret_name, saidx64_t *ret_L)
 			                                   /* (remember, need space for the final '\0')*/
 				nalloc += FALLOC; 
 				seq = realloc(seq, sizeof(char) * nalloc);
+				if (seq == NULL) {
+					fprintf(stderr, "%s\n", ffp->buffer);
+					fprintf(stderr, "%ld - %ld\n", n, nalloc);
+					fprintf(stderr, "Failed re-allocation in fasta read.\n");
+					abort();
+				}
 			}
 		}
 	}
