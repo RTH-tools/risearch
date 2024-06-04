@@ -1348,7 +1348,7 @@ void print_result(char *qname, const saidx64_t *sa, const saidx64_t *qsa, aln_re
 			result->energy);
 }
 
-void really_print_alignment(FILE *qout, aln_result_t *result) {
+void really_print_alignment(gzFile qout, aln_result_t *result) {
 	// Actually print out the output strings stores in the result.
 	// This is done so that all of the result strings are printed out
 	// at once and the multi-threading code can print everythin in one

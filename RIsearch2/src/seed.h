@@ -22,6 +22,7 @@
 #ifndef __SEED_H__
 #define __SEED_H__ 1
 
+#include <divsufsort64.h>
 extern void seeds_setup(int *seed, saidx64_t *querylen);
 
 #endif

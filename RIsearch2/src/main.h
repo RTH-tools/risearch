@@ -25,6 +25,7 @@
 #include "dsm.h"
 #include "sa.h"
 #include "lists.h"
+#include "zlib.h"
 
 typedef struct {
 	int idx;
@@ -68,7 +69,7 @@ typedef struct {
 	saidx64_t length;
 	sa_interval_list_t *intervals;
 	int seed[3];
-	FILE *out;
+	gzFile out;
 } query_t;
 
 extern int comp[6];

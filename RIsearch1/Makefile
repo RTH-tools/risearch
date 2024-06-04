@@ -1,12 +1,12 @@
-CFLAGS += -Wall -pedantic -ansi
+CFLAGS += -Wall -pedantic
 
-all: RISEARCH # debug
+all: RIsearch RIsearch.dbg
 
-RISEARCH: risearch.c fasta.c dsm.c weights.c
-	$(CC) $(CFLAGS) -O3 $^ -o RIsearch
+RIsearch: *.c *.h
+	$(CC) $(CFLAGS) -O3 $^ -DRISVERSION=1 -lm -o $@
 
-debug: risearch.c fasta.c dsm.c weights.c
-	$(CC) $(CFLAGS) -g -O0 -DDEBUG -DVERBOSE=2 $^ -o RIs-dbg
+RIsearch.dbg: *.c *.h
+	$(CC) $(CFLAGS) -g -O0 -DRISVERSION=1 -DDEBUG -DVERBOSE=2 $^ -lm -o $@
 
 
 .PHONY: clean
