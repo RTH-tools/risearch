@@ -2196,17 +2196,6 @@ sa_evaluate_interval (sa_interval_list_t * results, query_t * query,
 	}
     }
 
-  /*
-     printf("\nCounts of seeds of each seed length:\n");
-
-     for (i = 0; i < query_len; i++){
-     if (seed_lengths[i] != 0)
-     printf("seed_len[%d]=%lu \n", i, seed_lengths[i]);
-     }
-     printf("\n");
-
-     free(seed_lengths);
-   */
 
   free (M_right);
   free (Bq_right);

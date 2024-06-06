@@ -153,7 +153,7 @@ int fasta_read(fasta_t *ffp, char **ret_seq, char **ret_name, saidx64_t *ret_L)
 				seq = realloc(seq, sizeof(char) * nalloc);
 				if (seq == NULL) {
 					fprintf(stderr, "%s\n", ffp->buffer);
-					fprintf(stderr, "%ld - %ld\n", n, nalloc);
+					fprintf(stderr, "%d - %d\n", n, nalloc);
 					fprintf(stderr, "Failed re-allocation in fasta read.\n");
 					abort();
 				}

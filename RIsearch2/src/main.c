@@ -47,115 +47,128 @@
 
 const char *version = "2.1";
 extern int print_debug;
-int comp[6] = {0,4,3,2,1,5};
-                  /* a,g,c,u */
-int pair[6][6] = {{0,0,0,0,0,0},
-                  {0,0,0,0,1,0}, /* a */
-                  {0,0,0,1,1,0}, /* g */
-                  {0,0,1,0,0,0}, /* c */
-                  {0,1,1,0,0,0}, /* u */
-                  {0,0,0,0,0,0} };
+int comp[6] = { 0, 4, 3, 2, 1, 5 };
 
-                       /* a,g,c,u */
-int pair_noGU[6][6] = {{0,0,0,0,0,0},
-                       {0,0,0,0,1,0}, /* a */
-                       {0,0,0,1,0,0}, /* g */
-                       {0,0,1,0,0,0}, /* c */
-                       {0,1,0,0,0,0}, /* u */
-                       {0,0,0,0,0,0} };
+int pair[6][6] = {
+  /*  a, g, c, u */
+  {0, 0, 0, 0, 0, 0},
+  {0, 0, 0, 0, 1, 0},		/* a */
+  {0, 0, 0, 1, 1, 0},		/* g */
+  {0, 0, 1, 0, 0, 0},		/* c */
+  {0, 1, 1, 0, 0, 0},		/* u */
+  {0, 0, 0, 0, 0, 0}
+};
 
-const dsm_t* S;
+int pair_noGU[6][6] = {
+  /*  a, g, c, u */
+  {0, 0, 0, 0, 0, 0},
+  {0, 0, 0, 0, 1, 0},		/* a */
+  {0, 0, 0, 1, 0, 0},		/* g */
+  {0, 0, 1, 0, 0, 0},		/* c */
+  {0, 1, 0, 0, 0, 0},		/* u */
+  {0, 0, 0, 0, 0, 0}
+};
+
+const dsm_t *S;
 const char *fasta_raw, *suffix, *output, *query, *matrix = "t04";
 double min_energy = -20.0f;
 char **name;
-int threads = 0, seed_flag = 0,  seed_orig[3] = {6, 0, 0}, extPen = 0;
-int show_alignment=0;
-int noGUseed=0;
-double min_seed_energy_per_length=0.0;
-int seed_mismatch[2]={0,0};
-int seed_mismatch_flag=0, seed_threshold_flag=0;
-int max_ext_len=20;
+int threads = 0, seed_flag = 0, seed_orig[3] = { 6, 0, 0 }, extPen = 0;
+
+int show_alignment = 0;
+
+
+int noGUseed = 0;
+double min_seed_energy_per_length = 0.0;
+int seed_mismatch[2] = { 0, 0 };
+
+int seed_mismatch_flag = 0, seed_threshold_flag = 0;
+int max_ext_len = 20;
 saidx64_t *idx_lengths;
 saidx64_t num_idxs;
 saidx64_t *sum_l;
 
 /* usage information */
-void usage(const char *cmd)
+void
+usage (const char *cmd)
 {
-	fprintf(stderr, "\n");
-	fprintf(stderr, "================================ RIsearch2 v%s ===============================\n", version);
-	fprintf(stderr, "================ Energy based RNA-RNA interaction predictions ================\n\n");
-	fprintf(stderr, "Usage: %s [options]\n\n", cmd);
-	fprintf(stderr, "  -h,         --help\n");
-	fprintf(stderr, "                 show this message\n");
-	fprintf(stderr, "------------------------------------------------------------------------------\n");
-	fprintf(stderr, "--------------------------- SUFFIX ARRAY CREATION ----------------------------\n");
-	fprintf(stderr, "  -c <FILE>,  --create=FILE (.fa or .fa.gz)\n");
-	fprintf(stderr, "                 create suffix array for target sequence(s) together with\n");
-	fprintf(stderr, "                 their reverse complements, FASTA format, use '-' for stdin\n");
-	fprintf(stderr, "  -o <FILE>,  --output=FILE\n");
-	fprintf(stderr, "                 save created suffix array to given index file path \n");
-	fprintf(stderr, "------------------------------------------------------------------------------\n");
-	fprintf(stderr, "--------------------------- INTERACTION PREDICTION ---------------------------\n");
-	fprintf(stderr, "  -q <FILE>,  --query=FILE (.fa or .fa.gz)\n");
-	fprintf(stderr, "                 FASTA file for query sequence(s), use '-' for stdin\n");
-	fprintf(stderr, "  -i <FILE>,  --index=FILE\n");
-	fprintf(stderr, "                 pregenerated suffix array file for target sequence(s)\n");
-	fprintf(stderr, "  -s n:m/l,   --seed=n:m/l\n");
-	fprintf(stderr, "                 set seed length (-s l = length only; -s n:m = full interval;\n");
-	fprintf(stderr, "                 -s n:m/l = length in interval; default -s 6)\n");
-	fprintf(stderr, "  -l <int>,   --extension=L \n");
-	fprintf(stderr, "                 max extension length(L) on the seed (do DP for max this length\n");
-	fprintf(stderr, "                 up- and downstream of seed) (default L=20)\n");
-	fprintf(stderr, "  -e <float>, --energy=dG\n");
-	fprintf(stderr, "                 set deltaG energy threshold (in kcal/mol) to filter predictions\n");
-	fprintf(stderr, "                 (default=-20)\n");
-	fprintf(stderr, "  -z mat,     --matrix=mat\n");
-	fprintf(stderr, "                 set energy matrix to t99 or t04 (default) for RNA-RNA duplexes\n");
-	fprintf(stderr, "  -d <int>,   --penalty=dP\n");
-	fprintf(stderr, "                 per-nucleotide extension penalty given in dacal/mol\n");
-	fprintf(stderr, "                 (recommended: 30, default: 0)\n");
-	fprintf(stderr, "  -t <int>,   --threads=N\n");
-	fprintf(stderr, "                 set maximum number of threads to use (default=1)\n");
-	fprintf(stderr, "  -p,         --report_alignment     \n");
-	fprintf(stderr, "                 report predictions in detailed format\n");
-	fprintf(stderr, "  -p2,        --report_alignment=2   \n");
-	fprintf(stderr, "                 report predictions in a simple format together with CIGAR-like \n");
-	fprintf(stderr, "                 string for interaction structure\n");
-	fprintf(stderr, "  -p3,        --report_alignment=3   \n");
-	fprintf(stderr, "                 report predictions in a simple format together with \n");
-	fprintf(stderr, "                 binding site (3'->5'), flanking 5'end (3'->5') and \n");
-	fprintf(stderr, "                 flanking 3'end (5'->3') sequences of the target\n");
-	fprintf(stderr, "                 (required for post-processing of CRISPR off-target predictions)\n");
-	fprintf(stderr, "  --noGUseed     consider G-U wobble pairs as mismatch within the seed\n");
-	fprintf(stderr, "                 (only for locating seeds, energy model is not affected)\n");
-	fprintf(stderr, "  --verbose      verbose output\n");
-	fprintf(stderr, "------------------------------------------------------------------------------\n");
-	fprintf(stderr, "---------------------------- EXPERIMENTAL OPTIONS ----------------------------\n");
-	fprintf(stderr, "  -m c:p,     --mismatch=c:p\n");
-	fprintf(stderr, "                 introduce mismatched seeds\n");
-	fprintf(stderr, "                 Set the max num of mismatches (c) allowed in the seed and\n");
-	fprintf(stderr, "                 min num of consecutive matches required at seed start/end (p)\n");
-	fprintf(stderr, "                 ! These seeds will not overlap with perfect complementary seeds\n");
-	fprintf(stderr, "                 (default -m 0:0  (no mismatch);\n");
-	fprintf(stderr, "                 if you set c>0, please also set p>0 to avoid overlaps)\n");
-	fprintf(stderr, "  -x <float>, --seed_energy=F\n");
-	fprintf(stderr, "                 set energy per length threshold that filters seeds (default=0)\n");
-	fprintf(stderr, "\n");
-	exit(1);
+  fprintf (stderr, "\n");
+  fprintf (stderr, "================================ RIsearch2 v%s ===============================\n",
+	   version);
+  fprintf (stderr, "================ Energy based RNA-RNA interaction predictions ================\n\n");
+  fprintf (stderr, "Usage: %s [options]\n\n", cmd);
+  fprintf (stderr, "  -h,         --help\n");
+  fprintf (stderr, "                 show this message\n");
+  fprintf (stderr, "------------------------------------------------------------------------------\n");
+  fprintf (stderr, "--------------------------- SUFFIX ARRAY CREATION ----------------------------\n");
+  fprintf (stderr, "  -c <FILE>,  --create=FILE (.fa or .fa.gz)\n");
+  fprintf (stderr, "                 create suffix array for target sequence(s) together with\n");
+  fprintf (stderr, "                 their reverse complements, FASTA format, use '-' for stdin\n");
+  fprintf (stderr, "  -o <FILE>,  --output=FILE\n");
+  fprintf (stderr, "                 save created suffix array to given index file path \n");
+  fprintf (stderr, "------------------------------------------------------------------------------\n");
+  fprintf (stderr, "--------------------------- INTERACTION PREDICTION ---------------------------\n");
+  fprintf (stderr, "  -q <FILE>,  --query=FILE (.fa or .fa.gz)\n");
+  fprintf (stderr, "                 FASTA file for query sequence(s), use '-' for stdin\n");
+  fprintf (stderr, "  -i <FILE>,  --index=FILE\n");
+  fprintf (stderr, "                 pregenerated suffix array file for target sequence(s)\n");
+  fprintf (stderr, "  -s n:m/l,   --seed=n:m/l\n");
+  fprintf (stderr, "                 set seed length (-s l = length only; -s n:m = full interval;\n");
+  fprintf (stderr, "                 -s n:m/l = length in interval; default -s 6)\n");
+  fprintf (stderr, "  -l <int>,   --extension=L \n");
+  fprintf (stderr, "                 max extension length(L) on the seed (do DP for max this length\n");
+  fprintf (stderr, "                 up- and downstream of seed) (default L=20)\n");
+  fprintf (stderr, "  -e <float>, --energy=dG\n");
+  fprintf (stderr, "                 set deltaG energy threshold (in kcal/mol) to filter predictions\n");
+  fprintf (stderr, "                 (default=-20)\n");
+  fprintf (stderr, "  -z mat,     --matrix=mat\n");
+  fprintf (stderr, "                 set energy matrix to t99 or t04 (default) for RNA-RNA duplexes\n");
+  fprintf (stderr, "  -d <int>,   --penalty=dP\n");
+  fprintf (stderr, "                 per-nucleotide extension penalty given in dacal/mol\n");
+  fprintf (stderr, "                 (recommended: 30, default: 0)\n");
+  fprintf (stderr, "  -t <int>,   --threads=N\n");
+  fprintf (stderr, "                 set maximum number of threads to use (default=1)\n");
+  fprintf (stderr, "  -p,         --report_alignment     \n");
+  fprintf (stderr, "                 report predictions in detailed format\n");
+  fprintf (stderr, "  -p2,        --report_alignment=2   \n");
+  fprintf (stderr, "                 report predictions in a simple format together with CIGAR-like \n");
+  fprintf (stderr, "                 string for interaction structure\n");
+  fprintf (stderr, "  -p3,        --report_alignment=3   \n");
+  fprintf (stderr, "                 report predictions in a simple format together with \n");
+  fprintf (stderr, "                 binding site (3'->5'), flanking 5'end (3'->5') and \n");
+  fprintf (stderr, "                 flanking 3'end (5'->3') sequences of the target\n");
+  fprintf (stderr, "                 (required for post-processing of CRISPR off-target predictions)\n");
+  fprintf (stderr, "  --noGUseed     consider G-U wobble pairs as mismatch within the seed\n");
+  fprintf (stderr, "                 (only for locating seeds, energy model is not affected)\n");
+  fprintf (stderr, "  --verbose      verbose output\n");
+  fprintf (stderr, "------------------------------------------------------------------------------\n");
+  fprintf (stderr, "---------------------------- EXPERIMENTAL OPTIONS ----------------------------\n");
+  fprintf (stderr, "  -m c:p,     --mismatch=c:p\n");
+  fprintf (stderr, "                 introduce mismatched seeds\n");
+  fprintf (stderr, "                 Set the max num of mismatches (c) allowed in the seed and\n");
+  fprintf (stderr, "                 min num of consecutive matches required at seed start/end (p)\n");
+  fprintf (stderr, "                 ! These seeds will not overlap with perfect complementary seeds\n");
+  fprintf (stderr, "                 (default -m 0:0  (no mismatch);\n");
+  fprintf (stderr, "                 if you set c>0, please also set p>0 to avoid overlaps)\n");
+  fprintf (stderr, "  -x <float>, --seed_energy=F\n");
+  fprintf (stderr, "                 set energy per length threshold that filters seeds (default=0)\n");
+  fprintf (stderr, "\n");
+  exit (1);
 }
 
-void str_rev(char *s)
+void
+str_rev (char *s)
 {
-	int s_len = strlen(s);
-	int i;
-	char temp;
+  int s_len = strlen (s);
+  int i;
+  char temp;
 
-	for(i = 0; i < s_len / 2; i++) {
-		temp = s[i];
-		s[i] = s[s_len-i-1];
-		s[s_len-i-1] = temp;
-	}
+  for (i = 0; i < s_len / 2; i++)
+    {
+      temp = s[i];
+      s[i] = s[s_len - i - 1];
+      s[s_len - i - 1] = temp;
+    }
 }
 
 /* parse options */
@@ -166,8 +179,7 @@ void options(int argc, char *argv[])
 	int err_flag = 0;
 
 	/* list of all allowed options */
-	static struct option long_options[] =
-	{
+	static struct option long_options[] = {
 		{"help",            	no_argument,       0,   'h'},
 		{"create",          	required_argument, 0,   'c'},
 		{"output",          	required_argument, 0,   'o'},
@@ -179,6 +191,7 @@ void options(int argc, char *argv[])
 		{"matrix",          	required_argument, 0,   'z'},
 		{"penalty",         	required_argument, 0,   'd'},
 		{"threads",         	required_argument, 0,   't'},
+
 		{"report_alignment",	optional_argument, 0,   'p'},
 		{"verbose",         	no_argument,  &verbose,  1 },
 		{"noGUseed",         	no_argument,  &noGUseed,  1 },
@@ -192,24 +205,29 @@ void options(int argc, char *argv[])
 		switch(c) {
 			case 0:
 				break;
+
 			case 'c':
 				fasta_raw = optarg;
+				debug("opt: fasta_raw=%s\n", fasta_raw);
 				break;
 			case 'd':
 				extPen = atoi(optarg);
+				debug("opt: extPen=%d\n", extPen);
 				break;
+
 			case 'e':
-				//min_energy = atof(optarg);
 				min_energy = strtof(optarg, &ptr);
 				if (*ptr) {
 					// Did not read until \0, came across something that could not be converted to float
-					fprintf(stderr,"Non-numeric value passed with option -e : %s\n", optarg);
+					fprintf(stderr, "Non-numeric value passed with option -e : %s\n", optarg);
 					err_flag = 1;
-				} 
+				}
+				debug("opt: min_energy=%f\n", min_energy);
 				break;
 			case 'x':
 				seed_threshold_flag=1;
 				min_seed_energy_per_length = atof(optarg);
+				debug("opt: min_seed_energy_per_length=%f\n", min_seed_energy_per_length);
 				break;
 			case 'm':
 				/* "-m c:p" c:allowed number of mismatches. p is the number of consecutive matches required at the beginning and end of the seed.*/
@@ -217,39 +235,53 @@ void options(int argc, char *argv[])
 				seed_mismatch[0] = atoi(optarg);
 				optarg = strchr(optarg, ':');
 				if(!optarg){
-					fprintf(stderr,"Min number of consecutive matches required at the seed start/end is not defined, we set it to the same value as c.\n");
+					fprintf(stderr, "Min number of consecutive matches required at the seed start/end is not defined, we set it to the same value as c.\n");
 					seed_mismatch[1] = seed_mismatch[0];
 					break;
 				}
 				else
 					optarg++;
 				seed_mismatch[1] = atoi(optarg);
+				debug("opt: seed_mismatch=(%d,%d)\n", seed_mismatch[0], seed_mismatch[1]);
 				break;
 			case 'o':
 				output = optarg;
+				debug("opt: output=%s\n", output);
 				break;
 			case 'i':
 				suffix = optarg;
+				debug("opt: suffix=%s\n", suffix);
 				break;
 			case 'q':
 				query = optarg;
+				debug("opt: query=%s\n", query);
 				break;
 			case 'z':
 				matrix = strdup(optarg);
+				debug("opt: matrix=%s\n", matrix);
 				break;
 			case 'p':
 				if (optarg != NULL)
 					show_alignment = atoi(optarg);
 				else
 					show_alignment = 1;
+				debug("opt: show_alignment=%d\n", show_alignment);
 				break;
 			case 's':
 				/* -s l (length), -s m:n (interval), -s m:n/l (interval+length) */
 				seed_orig[0] = atoi(optarg);
-				optarg = strchr(optarg, ':'); if(!optarg) break; optarg++;
-				seed_orig[1] = atoi(optarg); seed_flag = 1;
-				optarg = strchr(optarg, '/'); if(!optarg) break; optarg++;
-				seed_orig[2] = atoi(optarg);
+				optarg = strchr(optarg, ':');
+				if (optarg) {
+					optarg++;
+					seed_orig[1] = atoi(optarg);
+					seed_flag = 1;
+					optarg = strchr(optarg, '/');
+					if (optarg) {
+						optarg++;
+						seed_orig[2] = atoi(optarg);
+					}
+				}
+				debug("opt: seed_orig=(%d,%d,%d)\n", seed_orig[0], seed_orig[1], seed_orig[2]);
 				break;
 			case 't':
 				//threads = MAX(1, atoi(optarg));
@@ -257,22 +289,25 @@ void options(int argc, char *argv[])
 					omp_set_dynamic(0);
 					omp_set_num_threads(threads);
 				}
+				debug("opt: threads=%d\n", threads);
 				break;
 			case 'l':
 				max_ext_len = MAX(0, atoi(optarg));
+				debug("opt: max_ext_len=%d\n", max_ext_len);
 				break;
 			case 'h':
 				usage(argv[0]);
 				break;
 			case '?':
-				fprintf(stderr,"Parameter -%c ignored: unknown option or missing argument.\n", optopt);
+				fprintf(stderr, "Parameter -%c ignored: unknown option or missing argument.\n", optopt);
+				err_flag = 1;
 				break;
 		}
 
 	}
 	if (err_flag) {
-		fprintf(stderr,"\nThere was a problem with the parameters passed, please check the settings again.\n");
-		abort ();
+		fprintf(stderr, "\nThere was a problem with the parameters passed, please check the settings again.\n");
+		exit(1);
 	}
 }
 
