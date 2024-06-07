@@ -25,11 +25,11 @@
 #include <string.h>
 #include <omp.h>
 #include <limits.h>
+#include <zlib.h>
 
 #include "main.h"
 #include "sa.h"
 #include "lists.h"
-#include "zlib.h"
 
 #define min(a,b) \
     ({ __typeof__ (a) _a = (a); \
