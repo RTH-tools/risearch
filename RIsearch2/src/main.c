@@ -80,7 +80,7 @@ int show_alignment = 0;
 
 int noGUseed = 0;
 double min_seed_energy_per_length = 0.0;
-int seed_mismatch[2] = { 0, 0 };
+int seed_mismatch[3] = { 0, 0, 0};
 
 int seed_mismatch_flag = 0, seed_threshold_flag = 0;
 int max_ext_len = 20;
@@ -230,19 +230,27 @@ void options(int argc, char *argv[])
 				debug("opt: min_seed_energy_per_length=%f\n", min_seed_energy_per_length);
 				break;
 			case 'm':
-				/* "-m c:p" c:allowed number of mismatches. p is the number of consecutive matches required at the beginning and end of the seed.*/
+				/* "-m c:s:e" c:allowed number of mismatches. s/e is the number of consecutive matches required at the beginning/end of the seed.*/
 				seed_mismatch_flag=1;
 				seed_mismatch[0] = atoi(optarg);
 				optarg = strchr(optarg, ':');
 				if(!optarg){
-					fprintf(stderr, "Min number of consecutive matches required at the seed start/end is not defined, we set it to the same value as c.\n");
+					seed_mismatch[2] = seed_mismatch[0];
 					seed_mismatch[1] = seed_mismatch[0];
+					debug("opt: seed_mismatch=(%d,%d,%d)\n", seed_mismatch[0], seed_mismatch[1], seed_mismatch[2]);
 					break;
 				}
-				else
-					optarg++;
+				optarg++;
 				seed_mismatch[1] = atoi(optarg);
-				debug("opt: seed_mismatch=(%d,%d)\n", seed_mismatch[0], seed_mismatch[1]);
+				optarg = strchr(optarg, ':');
+				if(!optarg){
+					seed_mismatch[2] = seed_mismatch[1];
+					debug("opt: seed_mismatch=(%d,%d,%d)\n", seed_mismatch[0], seed_mismatch[1], seed_mismatch[2]);
+					break;
+				}
+				optarg++;
+				seed_mismatch[2] = atoi(optarg);
+				debug("opt: seed_mismatch=(%d,%d,%d)\n", seed_mismatch[0], seed_mismatch[1], seed_mismatch[2]);
 				break;
 			case 'o':
 				output = optarg;

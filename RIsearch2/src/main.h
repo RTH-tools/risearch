@@ -82,7 +82,7 @@ extern double min_energy;
 extern const dsm_t *S;
 extern int seed_flag, seed_orig[3], max_ext_len;
 extern double min_seed_energy_per_length;
-extern int seed_mismatch[2], seed_mismatch_flag, seed_threshold_flag;
+extern int seed_mismatch[3], seed_mismatch_flag, seed_threshold_flag;
 //extern char* strdup(const char*);
 extern int verbose;
 extern int noGUseed;

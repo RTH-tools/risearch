@@ -2262,7 +2262,7 @@ sa_parallel_match_neg (const saidx64_t * qsa,	//!< Suffix array of the query
       // MISMATCH UPDATE
       if ((mismatch_count == 0)
 	  || ((mismatch_count > 0) && (mismatch_count <= seed_mismatch[0])
-	      && (last_match_count >= seed_mismatch[1])
+	      && (last_match_count >= seed_mismatch[2])
 	      && (last_match_count < depth)))
 	{
 	  sa_interval_add (results, sl, sr, ql, qr, offset);
