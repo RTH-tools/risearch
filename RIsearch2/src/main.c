@@ -180,7 +180,6 @@ void options(int argc, char *argv[])
 
 	/* list of all allowed options */
 	static struct option long_options[] = {
-		{"help",            	no_argument,       0,   'h'},
 		{"create",          	required_argument, 0,   'c'},
 		{"output",          	required_argument, 0,   'o'},
 		{"query",           	required_argument, 0,   'q'},
@@ -193,15 +192,16 @@ void options(int argc, char *argv[])
 		{"threads",         	required_argument, 0,   't'},
 
 		{"report_alignment",	optional_argument, 0,   'p'},
-		{"verbose",         	no_argument,  &verbose,  1 },
-		{"noGUseed",         	no_argument,  &noGUseed,  1 },
 		{"seed_energy",     	required_argument, 0,   'x'},
 		{"mismatch",        	required_argument, 0,   'm'},
+		{"noGUseed"         , no_argument      , 0, 'U'},
+		{"verbose"          , no_argument      , 0, 'v'},
+		{"help"             , no_argument      , 0, 'h'} ,
 		{0, 0, 0, 0}
 	};
 
 	/* parse all options */
-	while((c = getopt_long(argc, argv, "c:d:e:x:m:o:i:q:z:p::s:t:w:l:h", long_options, &option_index)) != -1) {
+	while ((c = getopt_long(argc, argv, "3:5:b:c:d:e:i:l:m:M:o:p::q:s:t:w:x:z:K:vUh", long_options, &option_index)) != -1) {
 		switch(c) {
 			case 0:
 				break;
@@ -302,6 +302,12 @@ void options(int argc, char *argv[])
 			case 'l':
 				max_ext_len = MAX(0, atoi(optarg));
 				debug("opt: max_ext_len=%d\n", max_ext_len);
+				break;
+			case 'U':
+				noGUseed = 1;
+				break;
+			case 'v':
+				verbose = 1;
 				break;
 			case 'h':
 				usage(argv[0]);
