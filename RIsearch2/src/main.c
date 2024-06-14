@@ -180,20 +180,26 @@ void options(int argc, char *argv[])
 
 	/* list of all allowed options */
 	static struct option long_options[] = {
-		{"create",          	required_argument, 0,   'c'},
-		{"output",          	required_argument, 0,   'o'},
-		{"query",           	required_argument, 0,   'q'},
-		{"index",           	required_argument, 0,   'i'},
-		{"seed",            	required_argument, 0,   's'},
-		{"extension",       	required_argument, 0,   'l'},
-		{"energy",          	required_argument, 0,   'e'},
-		{"matrix",          	required_argument, 0,   'z'},
-		{"penalty",         	required_argument, 0,   'd'},
-		{"threads",         	required_argument, 0,   't'},
-
-		{"report_alignment",	optional_argument, 0,   'p'},
-		{"seed_energy",     	required_argument, 0,   'x'},
-		{"mismatch",        	required_argument, 0,   'm'},
+		{"three_prime_match", required_argument, 0, '3'} ,
+		{"five_prime_match" , required_argument, 0, '5'} ,
+		{"bands"            , required_argument, 0, 'b'} ,
+		{"create"           , required_argument, 0, 'c'} ,
+		{"penalty"          , required_argument, 0, 'd'} ,
+		{"energy"           , required_argument, 0, 'e'} ,
+		{"index"            , required_argument, 0, 'i'} ,
+		{"extension"        , required_argument, 0, 'l'} ,
+		{"mismatch"         , required_argument, 0, 'm'} ,
+		{"matpath"          , required_argument, 0, 'M'} ,
+		{"output"           , required_argument, 0, 'o'} ,
+		{"report_alignment" , optional_argument, 0, 'p'} ,
+		{"query"            , required_argument, 0, 'q'} ,
+		{"seed"             , required_argument, 0, 's'} ,
+		{"threads"          , required_argument, 0, 't'} ,
+		{"weights"          , required_argument, 0, 'w'} ,
+		{"seed_energy"      , required_argument, 0, 'x'} ,
+		{"matrix2"          , required_argument, 0, 'y'} ,
+		{"matrix"           , required_argument, 0, 'z'} ,
+		{"temperature"      , required_argument, 0, 'K'} ,
 		{"noGUseed"         , no_argument      , 0, 'U'},
 		{"verbose"          , no_argument      , 0, 'v'},
 		{"help"             , no_argument      , 0, 'h'} ,
@@ -201,11 +207,19 @@ void options(int argc, char *argv[])
 	};
 
 	/* parse all options */
-	while ((c = getopt_long(argc, argv, "3:5:b:c:d:e:i:l:m:M:o:p::q:s:t:w:x:z:K:vUh", long_options, &option_index)) != -1) {
+	while ((c = getopt_long(argc, argv, "3:5:b:c:d:e:hi:K:l:m:M:o:p::q:s:t:Uvw:x:y:z:", long_options, &option_index)) != -1) {
 		switch(c) {
 			case 0:
 				break;
-
+			case '3':
+				/* placeholder */
+				break;
+			case '5':
+				/* placeholder */
+				break;
+			case 'b':
+				/* placeholder */
+				break;
 			case 'c':
 				fasta_raw = optarg;
 				debug("opt: fasta_raw=%s\n", fasta_raw);
@@ -214,7 +228,6 @@ void options(int argc, char *argv[])
 				extPen = atoi(optarg);
 				debug("opt: extPen=%d\n", extPen);
 				break;
-
 			case 'e':
 				min_energy = strtof(optarg, &ptr);
 				if (*ptr) {
@@ -224,10 +237,20 @@ void options(int argc, char *argv[])
 				}
 				debug("opt: min_energy=%f\n", min_energy);
 				break;
-			case 'x':
-				seed_threshold_flag=1;
-				min_seed_energy_per_length = atof(optarg);
-				debug("opt: min_seed_energy_per_length=%f\n", min_seed_energy_per_length);
+			case 'h':
+				usage(argv[0]);
+				break;
+			case 'i':
+				suffix = optarg;
+				debug("opt: suffix=%s\n", suffix);
+				break;
+			case 'K':
+				/* placeholder */
+				break;
+
+			case 'l':
+				max_ext_len = MAX(0, atoi(optarg));
+				debug("opt: max_ext_len=%d\n", max_ext_len);
 				break;
 			case 'm':
 				/* "-m c:s:e" c:allowed number of mismatches. s/e is the number of consecutive matches required at the beginning/end of the seed.*/
@@ -252,21 +275,12 @@ void options(int argc, char *argv[])
 				seed_mismatch[2] = atoi(optarg);
 				debug("opt: seed_mismatch=(%d,%d,%d)\n", seed_mismatch[0], seed_mismatch[1], seed_mismatch[2]);
 				break;
+			case 'M':
+				/* placeholder */
+				break;
 			case 'o':
 				output = optarg;
 				debug("opt: output=%s\n", output);
-				break;
-			case 'i':
-				suffix = optarg;
-				debug("opt: suffix=%s\n", suffix);
-				break;
-			case 'q':
-				query = optarg;
-				debug("opt: query=%s\n", query);
-				break;
-			case 'z':
-				matrix = strdup(optarg);
-				debug("opt: matrix=%s\n", matrix);
 				break;
 			case 'p':
 				if (optarg != NULL)
@@ -274,6 +288,10 @@ void options(int argc, char *argv[])
 				else
 					show_alignment = 1;
 				debug("opt: show_alignment=%d\n", show_alignment);
+				break;
+			case 'q':
+				query = optarg;
+				debug("opt: query=%s\n", query);
 				break;
 			case 's':
 				/* -s l (length), -s m:n (interval), -s m:n/l (interval+length) */
@@ -299,18 +317,26 @@ void options(int argc, char *argv[])
 				}
 				debug("opt: threads=%d\n", threads);
 				break;
-			case 'l':
-				max_ext_len = MAX(0, atoi(optarg));
-				debug("opt: max_ext_len=%d\n", max_ext_len);
-				break;
 			case 'U':
 				noGUseed = 1;
 				break;
 			case 'v':
 				verbose = 1;
 				break;
-			case 'h':
-				usage(argv[0]);
+			case 'w':
+				/* placeholder */
+				break;
+			case 'x':
+				seed_threshold_flag=1;
+				min_seed_energy_per_length = atof(optarg);
+				debug("opt: min_seed_energy_per_length=%f\n", min_seed_energy_per_length);
+				break;
+			case 'y':
+				/* placeholder */
+				break;
+			case 'z':
+				matrix = strdup(optarg);
+				debug("opt: matrix=%s\n", matrix);
 				break;
 			case '?':
 				fprintf(stderr, "Parameter -%c ignored: unknown option or missing argument.\n", optopt);
@@ -320,7 +346,7 @@ void options(int argc, char *argv[])
 
 	}
 	if (err_flag) {
-		fprintf(stderr, "\nThere was a problem with the parameters passed, please check the settings again.\n");
+		fprintf(stderr, "\nThere was a problem with the parameters passed, please check \nthe settings again, or try --help for help.\n");
 		exit(1);
 	}
 }
