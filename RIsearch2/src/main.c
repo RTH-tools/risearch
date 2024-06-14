@@ -207,7 +207,9 @@ void options(int argc, char *argv[])
 		{"create"           , required_argument, 0, 'c'} ,
 		{"penalty"          , required_argument, 0, 'd'} ,
 		{"energy"           , required_argument, 0, 'e'} ,
+		{"help"             , no_argument      , 0, 'h'} ,
 		{"index"            , required_argument, 0, 'i'} ,
+		{"temperature"      , required_argument, 0, 'K'} ,
 		{"extension"        , required_argument, 0, 'l'} ,
 		{"mismatch"         , required_argument, 0, 'm'} ,
 		{"matpath"          , required_argument, 0, 'M'} ,
@@ -216,14 +218,12 @@ void options(int argc, char *argv[])
 		{"query"            , required_argument, 0, 'q'} ,
 		{"seed"             , required_argument, 0, 's'} ,
 		{"threads"          , required_argument, 0, 't'} ,
+		{"noGUseed"         , no_argument      , 0, 'U'},
+		{"verbose"          , no_argument      , 0, 'v'},
 		{"weights"          , required_argument, 0, 'w'} ,
 		{"seed_energy"      , required_argument, 0, 'x'} ,
 		{"matrix2"          , required_argument, 0, 'y'} ,
 		{"matrix"           , required_argument, 0, 'z'} ,
-		{"temperature"      , required_argument, 0, 'K'} ,
-		{"noGUseed"         , no_argument      , 0, 'U'},
-		{"verbose"          , no_argument      , 0, 'v'},
-		{"help"             , no_argument      , 0, 'h'} ,
 		{0, 0, 0, 0}
 	};
 
