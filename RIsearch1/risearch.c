@@ -592,7 +592,7 @@ usage (char *progname)
   fprintf (stderr, "\t            This option requires -w.\n");
   fprintf (stderr, "\t-l <int>  max trace back length (default: 40)\n");
   fprintf (stderr,
-	   "\t-m <str>  matrix to use, t99 or t04(def) or su95 or su95_noGU or sl04_noGU \n");
+	   "\t-m <str>  matrix to use, t99 or t04(def) or su95 or su95_noGU or slh04_noGU \n");
   fprintf (stderr,
 	   "\t-w <str>  weights vector to use, CRISPR_20nt_5p_3p or noweights. \n");
   fprintf (stderr,
@@ -717,7 +717,7 @@ getMat (char *matname, short *bA_nu)
       extern short dsm_su95_rev_wGU_pos[6][6][6][6];
       bA_bas = &dsm_su95_rev_wGU_pos[0][0][0][0];
     }
-  else if (!strcmp (matname, "sl04_noGU"))
+  else if (!strcmp (matname, "slh04_noGU"))
     {
       extern short dsm_slh04_woGU_pos[6][6][6][6];
       bA_bas = &dsm_slh04_woGU_pos[0][0][0][0];
@@ -730,7 +730,7 @@ getMat (char *matname, short *bA_nu)
   else
     {
       fprintf (stderr,
-	       "Undefined matrix, -m needs to be set to either t99 or t04 for RNA-RNA interaction, su95 or su95_noGU for RNA-DNA interaction or sl04_noGU for DNA interaction\n");
+		fprintf(stderr, "Undefined matrix (%s), -m needs to be set to either t99 or t04 for RNA-RNA interaction, su95 or su95_noGU for RNA-DNA interaction or slh04_noGU for DNA interaction\n", matname);
       exit (1);
     }
   bA_ext = &dsm_extend[0][0][0][0];
