@@ -202,38 +202,40 @@ void options(int argc, char *argv[])
 
 	/* list of all allowed options */
 	static struct option long_options[] = {
-		{"three_prime_match" , required_argument , 0           , '3'} ,
-		{"five_prime_match"  , required_argument , 0           , '5'} ,
-		{"bands"             , required_argument , 0           , 'b'} ,
-		{"create"            , required_argument , 0           , 'c'} ,
-		{"penalty"           , required_argument , 0           , 'd'} ,
-		{"energy"            , required_argument , 0           , 'e'} ,
-		{"help"              , no_argument       , 0           , 'h'} ,
-		{"index"             , required_argument , 0           , 'i'} ,
-		{"temperature"       , required_argument , 0           , 'K'} ,
-		{"extension"         , required_argument , 0           , 'l'} ,
-		{"mismatch"          , required_argument , 0           , 'm'} ,
-		{"matpath"           , required_argument , 0           , 'M'} ,
-		{"output"            , required_argument , 0           , 'o'} ,
-		{"report_alignment"  , optional_argument , 0           , 'p'} ,
-		{"query"             , required_argument , 0           , 'q'} ,
-		{"seed"              , required_argument , 0           , 's'} ,
-		{"threads"           , required_argument , 0           , 't'} ,
-		{"noGUseed"          , no_argument       , 0           , 'U'} ,
-		{"verbose"           , no_argument       , 0           , 'v'} ,
-		{"weights"           , required_argument , 0           , 'w'} ,
-		{"seed_energy"       , required_argument , 0           , 'x'} ,
-		{"matrix2"           , required_argument , 0           , 'y'} ,
-		{"matrix"            , required_argument , 0           , 'z'} ,
-		{"one_vs_one"        , no_argument       , &all_vs_all , 0}   ,
+		{"one_vs_one"       , no_argument      , 0, '1'},
+		{"three_prime_match", required_argument, 0, '3'} ,
+		{"five_prime_match" , required_argument, 0, '5'} ,
+		{"bands"            , required_argument, 0, 'b'} ,
+		{"create"           , required_argument, 0, 'c'} ,
+		{"penalty"          , required_argument, 0, 'd'} ,
+		{"energy"           , required_argument, 0, 'e'} ,
+		{"help"             , no_argument      , 0, 'h'} ,
+		{"index"            , required_argument, 0, 'i'} ,
+		{"temperature"      , required_argument, 0, 'K'} ,
+		{"extension"        , required_argument, 0, 'l'} ,
+		{"mismatch"         , required_argument, 0, 'm'} ,
+		{"matpath"          , required_argument, 0, 'M'} ,
+		{"output"           , required_argument, 0, 'o'} ,
+		{"report_alignment" , optional_argument, 0, 'p'} ,
+		{"query"            , required_argument, 0, 'q'} ,
+		{"seed"             , required_argument, 0, 's'} ,
+		{"threads"          , required_argument, 0, 't'} ,
+		{"noGUseed"         , no_argument      , 0, 'U'},
+		{"verbose"          , no_argument      , 0, 'v'},
+		{"weights"          , required_argument, 0, 'w'} ,
+		{"seed_energy"      , required_argument, 0, 'x'} ,
+		{"matrix2"          , required_argument, 0, 'y'} ,
+		{"matrix"           , required_argument, 0, 'z'} ,
 		{0, 0, 0, 0}
 	};
 
 	/* parse all options */
-	while ((c = getopt_long(argc, argv, "3:5:b:c:d:e:hi:K:l:m:M:o:p::q:s:t:Uvw:x:y:z:", long_options, &option_index)) != -1) {
+	while ((c = getopt_long(argc, argv, "13:5:b:c:d:e:hi:K:l:m:M:o:p::q:s:t:Uvw:x:y:z:", long_options, &option_index)) != -1) {
 		switch(c) {
 			case 0:
 				break;
+			case '1':
+				all_vs_all = 0;
 			case '3':
 				/* placeholder */
 				break;
