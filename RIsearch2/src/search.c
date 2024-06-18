@@ -43,6 +43,7 @@
 
 //extern int do_extend_seed;
 extern int show_alignment;
+extern int all_vs_all;
 extern int extPen;
 
 int print_debug = 0;
@@ -1959,8 +1960,10 @@ extend_seed (saidx64_t j,	//!< Index in target suffix array (where seed match wa
 	result->q_new_right = q_start + result->best_right_i;
 
       }
-    result->found = 1;
-    print_result (qname, sa, qsa, result);
+    if (all_vs_all || strcmp(qname, name[idx]) == 0) {
+	    result->found = 1;
+	    print_result (qname, sa, qsa, result);
+    }
   }
 
 }

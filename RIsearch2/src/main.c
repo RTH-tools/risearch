@@ -76,6 +76,7 @@ char **name;
 int threads = 0, seed_flag = 0, seed_orig[3] = { 6, 0, 0 }, extPen = 0;
 
 int show_alignment = 0;
+int all_vs_all=1;
 
 
 int noGUseed = 0;
@@ -201,29 +202,30 @@ void options(int argc, char *argv[])
 
 	/* list of all allowed options */
 	static struct option long_options[] = {
-		{"three_prime_match", required_argument, 0, '3'} ,
-		{"five_prime_match" , required_argument, 0, '5'} ,
-		{"bands"            , required_argument, 0, 'b'} ,
-		{"create"           , required_argument, 0, 'c'} ,
-		{"penalty"          , required_argument, 0, 'd'} ,
-		{"energy"           , required_argument, 0, 'e'} ,
-		{"help"             , no_argument      , 0, 'h'} ,
-		{"index"            , required_argument, 0, 'i'} ,
-		{"temperature"      , required_argument, 0, 'K'} ,
-		{"extension"        , required_argument, 0, 'l'} ,
-		{"mismatch"         , required_argument, 0, 'm'} ,
-		{"matpath"          , required_argument, 0, 'M'} ,
-		{"output"           , required_argument, 0, 'o'} ,
-		{"report_alignment" , optional_argument, 0, 'p'} ,
-		{"query"            , required_argument, 0, 'q'} ,
-		{"seed"             , required_argument, 0, 's'} ,
-		{"threads"          , required_argument, 0, 't'} ,
-		{"noGUseed"         , no_argument      , 0, 'U'},
-		{"verbose"          , no_argument      , 0, 'v'},
-		{"weights"          , required_argument, 0, 'w'} ,
-		{"seed_energy"      , required_argument, 0, 'x'} ,
-		{"matrix2"          , required_argument, 0, 'y'} ,
-		{"matrix"           , required_argument, 0, 'z'} ,
+		{"three_prime_match" , required_argument , 0           , '3'} ,
+		{"five_prime_match"  , required_argument , 0           , '5'} ,
+		{"bands"             , required_argument , 0           , 'b'} ,
+		{"create"            , required_argument , 0           , 'c'} ,
+		{"penalty"           , required_argument , 0           , 'd'} ,
+		{"energy"            , required_argument , 0           , 'e'} ,
+		{"help"              , no_argument       , 0           , 'h'} ,
+		{"index"             , required_argument , 0           , 'i'} ,
+		{"temperature"       , required_argument , 0           , 'K'} ,
+		{"extension"         , required_argument , 0           , 'l'} ,
+		{"mismatch"          , required_argument , 0           , 'm'} ,
+		{"matpath"           , required_argument , 0           , 'M'} ,
+		{"output"            , required_argument , 0           , 'o'} ,
+		{"report_alignment"  , optional_argument , 0           , 'p'} ,
+		{"query"             , required_argument , 0           , 'q'} ,
+		{"seed"              , required_argument , 0           , 's'} ,
+		{"threads"           , required_argument , 0           , 't'} ,
+		{"noGUseed"          , no_argument       , 0           , 'U'} ,
+		{"verbose"           , no_argument       , 0           , 'v'} ,
+		{"weights"           , required_argument , 0           , 'w'} ,
+		{"seed_energy"       , required_argument , 0           , 'x'} ,
+		{"matrix2"           , required_argument , 0           , 'y'} ,
+		{"matrix"            , required_argument , 0           , 'z'} ,
+		{"one_vs_one"        , no_argument       , &all_vs_all , 0}   ,
 		{0, 0, 0, 0}
 	};
 

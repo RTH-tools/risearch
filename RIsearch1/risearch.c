@@ -90,6 +90,7 @@ int extPen = 0;			/* extension penalty; used to compute dsm */
 int force_start_val = -1;	/* values used to unitialize the first column of the M matrix. If sufficiently high, can force the interaction to start at position 0 of the DNA. */
 int vicinity = 0;		/* to omit neighboring hits (subalignments) */
 char printShort = 0;		/* switch p to print 1 line per IA, only pos&E, not IA itself */
+int all_vs_all = 1;             /* run all queries vs all targets */ 
 /*TODO possibly several print styles, Vienna-like (one line, but still IA) */
 int minScore = INT_MAX;		/* score cutoff; if not set, only print best */
 double maxEnergy = INT_MAX;	/*energy cutoff, not even print 'best' if it's not lower than that! */
@@ -108,6 +109,7 @@ main (int argc, char *argv[])
   char *nameQ, *nameT;
   short dsm[6][6][6][6];
   int check;
+  int count_q = 0, count_t = 0;
 
   getArgs (argc, argv);
 
@@ -123,6 +125,8 @@ main (int argc, char *argv[])
 	}
       while (ReadFASTA (ffpT, &two, &nameT, &len_seq2))
 	{
+		count_q = 0;
+		count_t++;
 /*can be done already when reading in first place */
 	  tseqIx = malloc ((len_seq2) * sizeof *tseqIx);
 	  check = seq2ix (len_seq2, two, tseqIx, nameT, "target");
@@ -147,6 +151,7 @@ main (int argc, char *argv[])
 		}
 	      while (ReadFASTA (ffpQ, &one, &nameQ, &len_seq1))
 		{
+			count_q++;
 
 		  qseqIx = malloc ((len_seq1) * sizeof *qseqIx);
 		  check = seq2ix (len_seq1, one, qseqIx, nameQ, "query");
@@ -155,10 +160,10 @@ main (int argc, char *argv[])
 		  if (check < 0)
 		    continue;	/*non-alpha char in input */
 		  free (one);	/*free'ing space for full seq, as we have it as ix version */
-		  if (printShort < 2)
-		    printf
-		      ("\n\nquery %s (%lu nts) vs. target %s (%lu nts)\n\n",
-		       nameQ, len_seq1, nameT, len_seq2);
+					if (printShort < 2 && (all_vs_all || count_t == count_q))
+						printf
+						    ("\n\nquery %d: %s (%lu nts) vs. target %d: %s (%lu nts)\n\n",
+						     count_q, nameQ, len_seq1, count_t, nameT, len_seq2);
 		  if (weighted_positions || (force_start_val >= 0))
 		    {
 		      if (force_start_val < 0)
@@ -729,7 +734,6 @@ getMat (char *matname, short *bA_nu)
     }
   else
     {
-      fprintf (stderr,
 		fprintf(stderr, "Undefined matrix (%s), -m needs to be set to either t99 or t04 for RNA-RNA interaction, su95 or su95_noGU for RNA-DNA interaction or slh04_noGU for DNA interaction\n", matname);
       exit (1);
     }
