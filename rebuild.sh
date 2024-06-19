@@ -2,7 +2,8 @@
 
 WD=`pwd`
 
-cd RIsearch1/src
+cd RIsearch1/src || exit 1
+mkdir -p ../bin
 make clean || exit 1
 make || exit 1
 cd $WD
@@ -15,6 +16,7 @@ cmake -DCMAKE_BUILD_TYPE="Release" -DBUILD_DIVSUFSORT64:BOOL=ON -DUSE_OPENMP:BOO
 make || exit 1
 cd - || exit 1
 cd src || exit 1
+mkdir -p ../bin
 make clean || exit 1
 make || exit 1
 cd $WD
