@@ -99,302 +99,220 @@ int filterE = 0;		/* flag : filterE in use */
 int weighted_positions = 0;	/*true if each position of interaction has a certain weight. */
 char *pos_weights = "CRISPR_20nt_3p_5p";	/*name of the array being used to assign weights to positions */
 
-int
-main (int argc, char *argv[])
+int main(int argc, char *argv[])
 {
-  unsigned long len_seq1, len_seq2;
-  char *one, *two;
-  unsigned char *qseqIx, *tseqIx;
-  FASTAFILE *ffpQ, *ffpT;	/*for query/target respectively */
-  char *nameQ, *nameT;
-  short dsm[6][6][6][6];
-  int check;
-  int count_q = 0, count_t = 0;
+	unsigned long len_seq1, len_seq2;
+	char *one, *two;
+	unsigned char *qseqIx, *tseqIx;
+	FASTAFILE *ffpQ, *ffpT;	/*for query/target respectively */
+	char *nameQ, *nameT;
+	short dsm[6][6][6][6];
+	int check;
+	int count_q = 0, count_t = 0;
 
-  getArgs (argc, argv);
+	getArgs(argc, argv);
 
-  getMat (mat_name, &dsm[0][0][0][0]);
+	getMat(mat_name, &dsm[0][0][0][0]);
 
-  if (seq2file_name)
-    {				/* target given as file - or STDIN */
-      ffpT = OpenFASTA (seq2file_name);
-      if (ffpT == NULL)
-	{
-	  fprintf (stderr, "Target file %s is not readable\n", seq2file_name);
-	  return -1;
-	}
-      while (ReadFASTA (ffpT, &two, &nameT, &len_seq2))
-	{
-		count_q = 0;
-		count_t++;
+	if (seq2file_name) {	/* target given as file - or STDIN */
+		ffpT = OpenFASTA(seq2file_name);
+		if (ffpT == NULL) {
+			fprintf(stderr, "Target file %s is not readable\n", seq2file_name);
+			return -1;
+		}
+		while (ReadFASTA(ffpT, &two, &nameT, &len_seq2)) {
+			count_q = 0;
+			count_t++;
 /*can be done already when reading in first place */
-	  tseqIx = malloc ((len_seq2) * sizeof *tseqIx);
-	  check = seq2ix (len_seq2, two, tseqIx, nameT, "target");
-	  if (check > 0)
-	    len_seq2 -= check;	/*removed gap characters */
-	  if (check < 0)
-	    continue;		/*non-alpha char in input */
-	  free (two);		/*free'ing space for full seq, as we have it as ix version */
+			tseqIx = malloc((len_seq2) * sizeof *tseqIx);
+			check = seq2ix(len_seq2, two, tseqIx, nameT, "target");
+			if (check > 0)
+				len_seq2 -= check;	/*removed gap characters */
+			if (check < 0)
+				continue;	/*non-alpha char in input */
+			free(two);	/*free'ing space for full seq, as we have it as ix version */
 
-	  if (seq1file_name)
-	    {			/* query given as file */
+			if (seq1file_name) {	/* query given as file */
 
-	      ffpQ = OpenFASTA (seq1file_name);
-	      if (ffpQ == NULL)
-		{
-		  fprintf (stderr, "Query file %s is not readable\n",
-			   seq1file_name);
-		  CloseFASTA (ffpT);
-		  free (tseqIx);
-		  free (nameT);
-		  return -1;
-		}
-	      while (ReadFASTA (ffpQ, &one, &nameQ, &len_seq1))
-		{
-			count_q++;
+				ffpQ = OpenFASTA(seq1file_name);
+				if (ffpQ == NULL) {
+					fprintf(stderr, "Query file %s is not readable\n", seq1file_name);
+					CloseFASTA(ffpT);
+					free(tseqIx);
+					free(nameT);
+					return -1;
+				}
+				while (ReadFASTA(ffpQ, &one, &nameQ, &len_seq1)) {
+					count_q++;
 
-		  qseqIx = malloc ((len_seq1) * sizeof *qseqIx);
-		  check = seq2ix (len_seq1, one, qseqIx, nameQ, "query");
-		  if (check > 0)
-		    len_seq1 -= check;	/*removed gap characters */
-		  if (check < 0)
-		    continue;	/*non-alpha char in input */
-		  free (one);	/*free'ing space for full seq, as we have it as ix version */
+					qseqIx = malloc((len_seq1) * sizeof *qseqIx);
+					check = seq2ix(len_seq1, one, qseqIx, nameQ, "query");
+					if (check > 0)
+						len_seq1 -= check;	/*removed gap characters */
+					if (check < 0)
+						continue;	/*non-alpha char in input */
+					free(one);	/*free'ing space for full seq, as we have it as ix version */
 					if (printShort < 2 && (all_vs_all || count_t == count_q))
-						printf
-						    ("\n\nquery %d: %s (%lu nts) vs. target %d: %s (%lu nts)\n\n",
-						     count_q, nameQ, len_seq1, count_t, nameT, len_seq2);
-		  if (weighted_positions || (force_start_val >= 0))
-		    {
-		      if (force_start_val < 0)
-			{
-			  fprintf (stderr,
-				   "Parameter -f must be set when using weights (-w).\n");
-			  exit (1);
+						printf("\n\nquery %d: %s (%lu nts) vs. target %d: %s (%lu nts)\n\n", count_q, nameQ, len_seq1, count_t, nameT, len_seq2);
+					if (weighted_positions || (force_start_val >= 0)) {
+						if (force_start_val < 0) {
+							fprintf(stderr, "Parameter -f must be set when using weights (-w).\n");
+							exit(1);
+						}
+						if (!weighted_positions) {
+							fprintf(stderr, "Parameter -w must be set when using force start (-f). Use array of weights \"noweigths\" to avoid this error.\n");
+							exit(1);
+						}
+						if (extPen || tblen != 40 || doSubopt || filterE || printShort || vicinity) {
+							fprintf(stderr, "Options -d -s -n -l -e -p are not available in combination with options -f -w \n");
+							exit(1);
+						}
+						if (all_vs_all || count_t == count_q) {
+							RIs_force_start_end_init(qseqIx, tseqIx, len_seq1, len_seq2, dsm, mat_name);
+						}
+					} else {
+						if (all_vs_all || count_t == count_q) {
+							RIs_linSpace(qseqIx, tseqIx, len_seq1, len_seq2, dsm, extPen, minScore, nameQ, nameT, mat_name);
+						}
+					}
+					free(qseqIx);
+					free(nameQ);
+				}
+				CloseFASTA(ffpQ);
+
+			} else if (seq1_cli) {	/* query given as command line parameter */
+				len_seq1 = strlen(seq1_cli);
+				qseqIx = malloc((len_seq1) * sizeof *qseqIx);
+				check = seq2ix(len_seq1, seq1_cli, qseqIx, "from command line", "query");
+				if (check > 0)
+					len_seq1 -= check;	/*removed gap characters */
+				if (check < 0)
+					return -1;	/*non-alpha char in input -- break would loop through all query seqs, no use */
+				if (printShort < 2)
+					printf("\n\nquery from_cli (%lu nts) vs. target %s (%lu nts)\n\n", len_seq1, nameT, len_seq2);
+				if (weighted_positions || (force_start_val >= 0)) {
+					if (force_start_val < 0) {
+						fprintf(stderr, "Parameter -f must be set when using weights (-w).\n");
+						exit(1);
+					}
+					if (!weighted_positions) {
+						fprintf(stderr, "Parameter -w must be set when using force start (-f). Use array of weights \"noweigths\" to avoid this error.\n");
+						exit(1);
+					}
+					if (extPen || tblen != 40 || doSubopt || filterE || printShort || vicinity) {
+						fprintf(stderr, "Options -d -s -n -l -e -p are not available in combination with options -f -w \n");
+						exit(1);
+					}
+					RIs_force_start_end_init(qseqIx, tseqIx, len_seq1, len_seq2, dsm, mat_name);
+				} else {
+					RIs_linSpace(qseqIx, tseqIx, len_seq1, len_seq2, dsm, extPen, minScore, "from_cli", nameT, mat_name);
+				}
+				free(qseqIx);
+
+			} else {
+				fprintf(stderr, "No query seq given!");
+				/* is caught in getArg already -- alternative run seq against itself!? */
 			}
-		      if (!weighted_positions)
-			{
-			  fprintf (stderr,
-				   "Parameter -w must be set when using force start (-f). Use array of weights \"noweigths\" to avoid this error.\n");
-			  exit (1);
+
+			free(tseqIx);
+			free(nameT);
+		}
+		CloseFASTA(ffpT);
+
+	} else if (seq2_cli) {	/*target given as command line parameter */
+
+		len_seq2 = strlen(seq2_cli);
+		tseqIx = malloc((len_seq2) * sizeof *tseqIx);
+		check = seq2ix(len_seq2, seq2_cli, tseqIx, "from command line", "target");
+		if (check > 0)
+			len_seq2 -= check;	/*removed gap characters */
+		if (check < 0)
+			return -1;	/*non-alpha char in input */
+
+		if (seq1file_name) {	/* query given as file */
+
+			ffpQ = OpenFASTA(seq1file_name);
+			if (ffpQ == NULL) {
+				fprintf(stderr, "Query file %s is not readable\n", seq1file_name);
+				free(tseqIx);
+				return -1;
 			}
-		      if (extPen || tblen != 40 || doSubopt || filterE
-			  || printShort || vicinity)
-			{
-			  fprintf (stderr,
-				   "Options -d -s -n -l -e -p are not available in combination with options -f -w \n");
-			  exit (1);
+			while (ReadFASTA(ffpQ, &one, &nameQ, &len_seq1)) {
+
+				qseqIx = malloc((len_seq1) * sizeof *qseqIx);
+				check = seq2ix(len_seq1, one, qseqIx, nameQ, "query");
+				if (check > 0)
+					len_seq1 -= check;	/*removed gap characters */
+				if (check < 0)
+					continue;	/*non-alpha char in input */
+				free(one);
+
+				if (printShort < 2)
+					printf("\n\nquery %s (%lu nts) vs. target from_cli (%lu nts)\n\n", nameQ, len_seq1, len_seq2);
+				if (weighted_positions || (force_start_val >= 0)) {
+					if (force_start_val < 0) {
+						fprintf(stderr, "Parameter -f must be set when using weights (-w).\n");
+						exit(1);
+					}
+					if (!weighted_positions) {
+						fprintf(stderr, "Parameter -w must be set when using force start (-f). Use array of weights \"noweigths\" to avoid this error.\n");
+						exit(1);
+					}
+					if (extPen || tblen != 40 || doSubopt || filterE || printShort || vicinity) {
+						fprintf(stderr, "Options -d -s -n -l -e -p are not available in combination with options -f -w \n");
+						exit(1);
+					}
+					RIs_force_start_end_init(qseqIx, tseqIx, len_seq1, len_seq2, dsm, mat_name);
+				} else {
+					RIs_linSpace(qseqIx, tseqIx, len_seq1, len_seq2, dsm, extPen, minScore, nameQ, "from_cli", mat_name);
+				}
+				free(qseqIx);
+				free(nameQ);
 			}
-		      RIs_force_start_end_init (qseqIx, tseqIx, len_seq1,
-						len_seq2, dsm, mat_name);
-		    }
-		  else
-		    {
-		      RIs_linSpace (qseqIx, tseqIx, len_seq1, len_seq2, dsm,
-				    extPen, minScore, nameQ, nameT, mat_name);
-		    }
-		  free (qseqIx);
-		  free (nameQ);
+			CloseFASTA(ffpQ);
+
+		} else if (seq1_cli) {	/* query given as command line parameter */
+
+			len_seq1 = strlen(seq1_cli);
+			qseqIx = malloc((len_seq1) * sizeof *qseqIx);
+			check = seq2ix(len_seq1, seq1_cli, qseqIx, "from command line", "query");
+			if (check > 0)
+				len_seq1 -= check;	/*removed gap characters */
+			if (check < 0)
+				return -1;	/* non-alpha char in input -- break would loop through queries, no use */
+			if (printShort < 2)
+				printf("\n\nquery from_cli (%lu nts) vs. target from_cli (%lu nts)\n\n", len_seq1, len_seq2);
+			if (weighted_positions || (force_start_val >= 0)) {
+				if (force_start_val < 0) {
+					fprintf(stderr, "Parameter -f must be set when using weights (-w).\n");
+					exit(1);
+				}
+				if (!weighted_positions) {
+					fprintf(stderr, "Parameter -w must be set when using force start (-f). Use array of weights \"noweigths\" to avoid this error.\n");
+					exit(1);
+				}
+				if (extPen || tblen != 40 || doSubopt || filterE || printShort || vicinity) {
+					fprintf(stderr, "Options -d -s -n -l -e -p are not available in combination with options -f -w \n");
+					exit(1);
+				}
+				RIs_force_start_end_init(qseqIx, tseqIx, len_seq1, len_seq2, dsm, mat_name);
+			} else {
+				RIs_linSpace(qseqIx, tseqIx, len_seq1, len_seq2, dsm, extPen, minScore, "from_cli", "from_cli", mat_name);
+			}
+			free(qseqIx);
+		} else {
+			fprintf(stderr, "No query seq given!");
+			/* is caught in getArg already -- alternative run seq against itself!? */
 		}
-	      CloseFASTA (ffpQ);
 
-	    }
-	  else if (seq1_cli)
-	    {			/* query given as command line parameter */
-	      len_seq1 = strlen (seq1_cli);
-	      qseqIx = malloc ((len_seq1) * sizeof *qseqIx);
-	      check =
-		seq2ix (len_seq1, seq1_cli, qseqIx, "from command line",
-			"query");
-	      if (check > 0)
-		len_seq1 -= check;	/*removed gap characters */
-	      if (check < 0)
-		return -1;	/*non-alpha char in input -- break would loop through all query seqs, no use */
-	      if (printShort < 2)
-		printf
-		  ("\n\nquery from_cli (%lu nts) vs. target %s (%lu nts)\n\n",
-		   len_seq1, nameT, len_seq2);
-	      if (weighted_positions || (force_start_val >= 0))
-		{
-		  if (force_start_val < 0)
-		    {
-		      fprintf (stderr,
-			       "Parameter -f must be set when using weights (-w).\n");
-		      exit (1);
-		    }
-		  if (!weighted_positions)
-		    {
-		      fprintf (stderr,
-			       "Parameter -w must be set when using force start (-f). Use array of weights \"noweigths\" to avoid this error.\n");
-		      exit (1);
-		    }
-		  if (extPen || tblen != 40 || doSubopt || filterE
-		      || printShort || vicinity)
-		    {
-		      fprintf (stderr,
-			       "Options -d -s -n -l -e -p are not available in combination with options -f -w \n");
-		      exit (1);
-		    }
-		  RIs_force_start_end_init (qseqIx, tseqIx, len_seq1,
-					    len_seq2, dsm, mat_name);
-		}
-	      else
-		{
-		  RIs_linSpace (qseqIx, tseqIx, len_seq1, len_seq2, dsm,
-				extPen, minScore, "from_cli", nameT,
-				mat_name);
-		}
-	      free (qseqIx);
+		free(tseqIx);
 
-	    }
-	  else
-	    {
-	      fprintf (stderr, "No query seq given!");
-	      /* is caught in getArg already -- alternative run seq against itself!? */
-	    }
-
-	  free (tseqIx);
-	  free (nameT);
-	}
-      CloseFASTA (ffpT);
-
-    }
-  else if (seq2_cli)
-    {				/*target given as command line parameter */
-
-      len_seq2 = strlen (seq2_cli);
-      tseqIx = malloc ((len_seq2) * sizeof *tseqIx);
-      check =
-	seq2ix (len_seq2, seq2_cli, tseqIx, "from command line", "target");
-      if (check > 0)
-	len_seq2 -= check;	/*removed gap characters */
-      if (check < 0)
-	return -1;		/*non-alpha char in input */
-
-      if (seq1file_name)
-	{			/* query given as file */
-
-	  ffpQ = OpenFASTA (seq1file_name);
-	  if (ffpQ == NULL)
-	    {
-	      fprintf (stderr, "Query file %s is not readable\n",
-		       seq1file_name);
-	      free (tseqIx);
-	      return -1;
-	    }
-	  while (ReadFASTA (ffpQ, &one, &nameQ, &len_seq1))
-	    {
-
-	      qseqIx = malloc ((len_seq1) * sizeof *qseqIx);
-	      check = seq2ix (len_seq1, one, qseqIx, nameQ, "query");
-	      if (check > 0)
-		len_seq1 -= check;	/*removed gap characters */
-	      if (check < 0)
-		continue;	/*non-alpha char in input */
-	      free (one);
-
-	      if (printShort < 2)
-		printf
-		  ("\n\nquery %s (%lu nts) vs. target from_cli (%lu nts)\n\n",
-		   nameQ, len_seq1, len_seq2);
-	      if (weighted_positions || (force_start_val >= 0))
-		{
-		  if (force_start_val < 0)
-		    {
-		      fprintf (stderr,
-			       "Parameter -f must be set when using weights (-w).\n");
-		      exit (1);
-		    }
-		  if (!weighted_positions)
-		    {
-		      fprintf (stderr,
-			       "Parameter -w must be set when using force start (-f). Use array of weights \"noweigths\" to avoid this error.\n");
-		      exit (1);
-		    }
-		  if (extPen || tblen != 40 || doSubopt || filterE
-		      || printShort || vicinity)
-		    {
-		      fprintf (stderr,
-			       "Options -d -s -n -l -e -p are not available in combination with options -f -w \n");
-		      exit (1);
-		    }
-		  RIs_force_start_end_init (qseqIx, tseqIx, len_seq1,
-					    len_seq2, dsm, mat_name);
-		}
-	      else
-		{
-		  RIs_linSpace (qseqIx, tseqIx, len_seq1, len_seq2, dsm,
-				extPen, minScore, nameQ, "from_cli",
-				mat_name);
-		}
-	      free (qseqIx);
-	      free (nameQ);
-	    }
-	  CloseFASTA (ffpQ);
-
-	}
-      else if (seq1_cli)
-	{			/* query given as command line parameter */
-
-	  len_seq1 = strlen (seq1_cli);
-	  qseqIx = malloc ((len_seq1) * sizeof *qseqIx);
-	  check =
-	    seq2ix (len_seq1, seq1_cli, qseqIx, "from command line", "query");
-	  if (check > 0)
-	    len_seq1 -= check;	/*removed gap characters */
-	  if (check < 0)
-	    return -1;		/* non-alpha char in input -- break would loop through queries, no use */
-	  if (printShort < 2)
-	    printf
-	      ("\n\nquery from_cli (%lu nts) vs. target from_cli (%lu nts)\n\n",
-	       len_seq1, len_seq2);
-	  if (weighted_positions || (force_start_val >= 0))
-	    {
-	      if (force_start_val < 0)
-		{
-		  fprintf (stderr,
-			   "Parameter -f must be set when using weights (-w).\n");
-		  exit (1);
-		}
-	      if (!weighted_positions)
-		{
-		  fprintf (stderr,
-			   "Parameter -w must be set when using force start (-f). Use array of weights \"noweigths\" to avoid this error.\n");
-		  exit (1);
-		}
-	      if (extPen || tblen != 40 || doSubopt || filterE || printShort
-		  || vicinity)
-		{
-		  fprintf (stderr,
-			   "Options -d -s -n -l -e -p are not available in combination with options -f -w \n");
-		  exit (1);
-		}
-	      RIs_force_start_end_init (qseqIx, tseqIx, len_seq1, len_seq2,
-					dsm, mat_name);
-	    }
-	  else
-	    {
-	      RIs_linSpace (qseqIx, tseqIx, len_seq1, len_seq2, dsm, extPen,
-			    minScore, "from_cli", "from_cli", mat_name);
-	    }
-	  free (qseqIx);
-	}
-      else
-	{
-	  fprintf (stderr, "No query seq given!");
-	  /* is caught in getArg already -- alternative run seq against itself!? */
+	} else {
+		fprintf(stderr, "No target seq given!");
+		/* is caught in getArg already -- alternative run seq against itself!? */
 	}
 
-      free (tseqIx);
-
-    }
-  else
-    {
-      fprintf (stderr, "No target seq given!");
-      /* is caught in getArg already -- alternative run seq against itself!? */
-    }
-
-  return 0;
+	return 0;
 }
 
 /* can save first traversal as length is known before! */
@@ -630,9 +548,12 @@ void
 getArgs (int argc, char *argv[])
 {
   char c;
-  while ((c = getopt (argc, argv, "q:t:Q:T:d:X:m:s:e:n:w:l:f:p::")) != -1)
+  while ((c = getopt (argc, argv, "1q:t:Q:T:d:X:m:s:e:n:w:l:f:p::")) != -1)
     switch (c)
       {
+		case '1':
+			all_vs_all = 0;
+			break;
       case 'q':
 	seq1file_name = optarg;
 	break;
@@ -734,7 +655,7 @@ getMat (char *matname, short *bA_nu)
     }
   else
     {
-		fprintf(stderr, "Undefined matrix (%s), -m needs to be set to either t99 or t04 for RNA-RNA interaction, su95 or su95_noGU for RNA-DNA interaction or slh04_noGU for DNA interaction\n", matname);
+	    fprintf(stderr, "Undefined matrix (%s), -m needs to be set to either t99 or t04 for RNA-RNA interaction, su95 or su95_noGU for RNA-DNA interaction or slh04_noGU for DNA interaction\n", matname);
       exit (1);
     }
   bA_ext = &dsm_extend[0][0][0][0];

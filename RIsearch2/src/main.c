@@ -133,6 +133,7 @@ void usage(const char *cmd)
 	fprintf(stderr, "                 report only predictions with a matching 5' PAM reverse complement\n");
 	fprintf(stderr, "                 for e.g. cas12a this corresponds to PC=^([^a]aaa) matching TTTV 5'PAMs\n");
 	fprintf(stderr, "                 report mode 3/4 required\n");
+	fprintf(stderr, "  -1          --one_vs_one only print results where query name matches target name\n");
 	fprintf(stderr, "  -p,         --report_alignment     \n");
 	fprintf(stderr, "                 report predictions in detailed format\n");
 	fprintf(stderr, "  -p2,        --report_alignment=2   \n");

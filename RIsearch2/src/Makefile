@@ -1,4 +1,6 @@
-CFLAGS += -fopenmp -Wall -I../libdivsufsort-2.0.1/build/include -DRISEARCH2  -DRISVERSION=2
+#PATH to where RIsearch tables are to be found
+MATPATH = \"/home/projects/users/anthon/projects/2024_risearch/temp_par/risearch/tables\"
+CFLAGS += -fopenmp -Wall -I../libdivsufsort-2.0.1/build/include -DRISEARCH2 -DMATPATH=$(MATPATH) -DRISVERSION=2
 CLIBS += -lz -lpcre -lm
 
 all: ../bin/risearch2.x ../bin/risearch2.dbg.x
@@ -12,4 +14,4 @@ all: ../bin/risearch2.x ../bin/risearch2.dbg.x
 .PHONY: clean
 
 clean:
-	rm -f ../bin/risearch2.x ../bin/risearch2.dbg.x conv.x
+	rm -f ../bin/risearch2.x ../bin/risearch2.dbg.x

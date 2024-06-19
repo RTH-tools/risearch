@@ -1,11 +1,13 @@
 #!/bin/bash
 
-if [ -f bin/risearch2.precompiled.x ];
-then
-   echo "bin/risearch2.precompiled.x exists."
-else
-   cp bin/risearch2.x bin/risearch2.precompiled.x
-fi
+WD=`pwd`
+
+cd RIsearch1/src
+make clean || exit 1
+make || exit 1
+cd $WD
+
+cd RIsearch2
 rm -rf libdivsufsort-2.0.1/build || exit 1
 mkdir -p libdivsufsort-2.0.1/build || exit 1
 cd libdivsufsort-2.0.1/build || exit 1
@@ -15,13 +17,14 @@ cd - || exit 1
 cd src || exit 1
 make clean || exit 1
 make || exit 1
-cd -
+cd $WD
 
 echo
 echo '-------------------------------------------------'
-echo 'You should now be able to run RIsearch2 by typing'
+echo 'You should now be able to run RIsearch1 and RIsearch2 by typing'
 echo '-------------------------------------------------'
 
-echo "$PWD"/bin/risearch2.x
+echo "$PWD"/RIsearch1/bin/RISearch
+echo "$PWD"/RIsearch2/bin/risearch2.x
 
 
