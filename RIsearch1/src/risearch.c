@@ -529,6 +529,8 @@ usage (char *progname)
 	   "\t            An interaction is only printed if the predicted hybridization energy is lower than (or equal to) this threshold.\n");
   fprintf (stderr,
 	   "\t            Also the 'best hit' per query/target pair might be filtered out, appears only once if at all (and not necessarily as first).\n");
+	fprintf(stderr,
+		"\t-1          When multiple queries and targets are given, run them one_vs_one\n");
   fprintf (stderr,
 	   "\t-p          switch for short output, for backwards compatibility, same as -p1\n");
   fprintf (stderr, "\t-p[1-3]     different shorter output modes:\n");
@@ -645,13 +647,13 @@ getMat (char *matname, short *bA_nu)
     }
   else if (!strcmp (matname, "slh04_noGU"))
     {
-      extern short dsm_slh04_woGU_pos[6][6][6][6];
-      bA_bas = &dsm_slh04_woGU_pos[0][0][0][0];
+      extern short dsm_slh04_noGU_pos[6][6][6][6];
+      bA_bas = &dsm_slh04_noGU_pos[0][0][0][0];
     }
   else if (!strcmp (matname, "su95_noGU"))
     {
-      extern short dsm_su95_rev_woGU_pos[6][6][6][6];
-      bA_bas = &dsm_su95_rev_woGU_pos[0][0][0][0];
+      extern short dsm_su95_rev_noGU_pos[6][6][6][6];
+      bA_bas = &dsm_su95_rev_noGU_pos[0][0][0][0];
     }
   else
     {
