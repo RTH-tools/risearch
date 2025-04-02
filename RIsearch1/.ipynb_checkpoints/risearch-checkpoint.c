@@ -704,7 +704,8 @@ getMat (char *matname, short *bA_nu)
   int i;
   extern short dsm_extend[6][6][6][6];
   bA_ext = &dsm_extend[0][0][0][0];
-  if(!strcmp (matname, "modified")){
+  int e1,e2;  
+  if(sscanf(matname, "modified %d %d", &e1, &e2) == 2){
   	set_modified();
   	extern short modified_dsm[6][6][6][6];
 	extern short modified_dsm_extend[6][6][6][6];
@@ -1898,24 +1899,30 @@ RIs_linSpace (unsigned char *qseq,	/* query sequence - numeric representation */
 #endif
       nt_count =
 	maxHit->qend - maxHit->qbeg + 1 + maxHit->tend - maxHit->tbeg + 1;
-      if(!(strcmp (matname, "modified")){
-          
-        energy = (maxHit->max + extensionpenalty * nt_count - 249.0) / (-100.0);
+      //   
+      int e1,e2;  
+      if(sscanf(matname, "modified %d %d", &e1, &e2) == 2){
+        if(e2 == 0) e2 = 100;
+        printf("e1 = %d e2 = %d \n",e1,e2\n);  
+        energy = (maxHit->max + extensionpenalty * nt_count - e1) / (-e2);
           
       }
       else if (!(strcmp (matname, "t99")) || !(strcmp (matname, "t04")))
 	{
+      printf("t04\n");  
 	  energy =
 	    (maxHit->max + extensionpenalty * nt_count - 559.0) / (-100.0);
 	}
       else if (!(strcmp (matname, "su95"))
 	       || !(strcmp (matname, "su95_noGU")))
 	{
+      printf("Should be here!\n");   
 	  energy =
 	    (maxHit->max + extensionpenalty * nt_count - 249.0) / (-100.0);
 	}
       else
 	{
+      printf("shouldnt be here!\n");  
 	  energy =
 	    (maxHit->max + extensionpenalty * nt_count - 363.0) / (-100.0);
 	}

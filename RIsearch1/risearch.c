@@ -593,7 +593,7 @@ usage (char *progname)
   fprintf (stderr, "\t            This option requires -w.\n");
   fprintf (stderr, "\t-l <int>  max trace back length (default: 40)\n");
   fprintf (stderr,
-	   "\t-m <str>  matrix to use, t99 or t04(def) or su95 or su95_noGU or sl04_noGU \n");
+	   "\t-m <str>  matrix to use, t99 or t04(def) or su95 or su95_noGU or sl04_noGU or modified e1 e2\n");
   fprintf (stderr,
 	   "\t-w <str>  weights vector to use, CRISPR_20nt_5p_3p or noweights. \n");
   fprintf (stderr,
@@ -704,7 +704,8 @@ getMat (char *matname, short *bA_nu)
   int i;
   extern short dsm_extend[6][6][6][6];
   bA_ext = &dsm_extend[0][0][0][0];
-  if(!strcmp (matname, "modified")){
+  double e1,e2;  
+  if(sscanf(matname, "modified %lf %lf", &e1, &e2) == 2){
   	set_modified();
   	extern short modified_dsm[6][6][6][6];
 	extern short modified_dsm_extend[6][6][6][6];
@@ -739,7 +740,7 @@ getMat (char *matname, short *bA_nu)
   else
     {
       fprintf (stderr,
-	       "Undefined matrix, -m needs to be set to either t99 or t04 for RNA-RNA interaction, su95 or su95_noGU for RNA-DNA interaction or sl04_noGU for DNA interaction\n");
+	       "Undefined matrix, -m needs to be set to either t99 or t04 for RNA-RNA interaction, su95 or su95_noGU for RNA-DNA interaction or sl04_noGU for DNA interaction or modified e1 e2 \n");
       exit (1);
     }
 
@@ -1898,10 +1899,10 @@ RIs_linSpace (unsigned char *qseq,	/* query sequence - numeric representation */
 #endif
       nt_count =
 	maxHit->qend - maxHit->qbeg + 1 + maxHit->tend - maxHit->tbeg + 1;
-      if(!(strcmp (matname, "modified")){
-          
-        energy = (maxHit->max + extensionpenalty * nt_count - 249.0) / (-100.0);
-          
+      //   
+      double e1,e2;  
+      if(sscanf(matname, "modified %lf %lf", &e1, &e2) == 2){
+        energy = (maxHit->max + extensionpenalty * nt_count - e1) / (-e2);          
       }
       else if (!(strcmp (matname, "t99")) || !(strcmp (matname, "t04")))
 	{
@@ -2046,7 +2047,11 @@ RIs_linSpace (unsigned char *qseq,	/* query sequence - numeric representation */
 
 	  nt_count =
 	    maxHit->qend - maxHit->qbeg + 1 + maxHit->tend - maxHit->tbeg + 1;
-	  if (!(strcmp (matname, "t99")) || !(strcmp (matname, "t04")))
+	  double e1,e2;  
+    if(sscanf(matname, "modified %lf %lf", &e1, &e2) == 2){
+        energy = (maxHit->max + extensionpenalty * nt_count - e1) / (-e2);          
+      }  
+	  else if (!(strcmp (matname, "t99")) || !(strcmp (matname, "t04")))
 	    {
 	      energy =
 		(maxHit->max + extensionpenalty * nt_count -
@@ -2581,8 +2586,11 @@ RIs_force_start_end_weighted (unsigned char *qseq,	/* query sequence - numeric r
 	    }
 	}
       printf ("%s\t%s\n", query_alignment, target_alignment);
-
-      if (!(strcmp (matname, "t99")) || !(strcmp (matname, "t04")))
+	  double e1,e2;  
+    	if(sscanf(matname, "modified %lf %lf", &e1, &e2) == 2){
+        energy = (max_score - force_start_val - e1) / (e2);         
+      }   
+   else if (!(strcmp (matname, "t99")) || !(strcmp (matname, "t04")))
 	{
 	  energy = (max_score - force_start_val - 559.0) / (-100.0);
 	}

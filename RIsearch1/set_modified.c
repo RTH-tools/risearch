@@ -32,7 +32,7 @@ void test(){
 	printf("running test:\n");
 	extern short dsm_su95_rev_woGU_pos[6][6][6][6];
 	short* p_dsm_su95_rev_woGU_pos =&dsm_su95_rev_woGU_pos[0][0][0][0];
-	set_modified_dsms();
+	set_modified();
 	int counter = 0 ;
 	for(int i=0 ; i<1296 ;i++){
 		int x = *(p_modified_dsm +i);
