@@ -4,25 +4,21 @@ import os
 
 def numpy_to_csv(matrix = np.random.rand(36, 36) , filename = "./modified_dsm.csv"):
     # Get the directory from the provided path
-    dir_path = os.path.dirname(filename)
-
-    # Construct the full path to 'risearch.c' in the same directory
-    risearch_file_path = os.path.join(dir_path, 'risearch.c')
-
-    # Assert if the file exists in the directory
-    assert os.path.exists(risearch_file_path), f"Error: 'risearch.c' not found in the directory: {dir_path}"
+    module_dir = os.path.dirname(os.path.abspath(__file__))
+    file_path = os.path.join(module_dir, filename)
     assert matrix.shape == (36, 36), f"Expected shape (36, 36), but got {matrix.shape}"
     df = pd.DataFrame(matrix)
-    df.to_csv(filename, index=False, header=False)
+    df.to_csv(file_path, index=False, header=False)
 
-if __name__ == "__main__":
 
+def dsm_variable_to_csv(dsm_name = "dsm_su95_rev_woGU_pos"):
     import ctypes
     import numpy as np
 
-
+    module_dir = os.path.dirname(os.path.abspath(__file__))
+    dsm_so_path = os.path.join(module_dir, "./dsm.so")
     # Load the shared library
-    lib = ctypes.CDLL("./dsm.so")  # Use "dsm.dll" on Windows
+    lib = ctypes.CDLL(dsm_so_path)  # Use "dsm.dll" on Windows
 
     # Define a function to load and reshape the 4D array
     def load_and_reshape_array(var_name):
@@ -42,8 +38,8 @@ if __name__ == "__main__":
         return np_reshaped
 
     # Call the function for both variables
-    dsm_su95_rev_woGU_pos = load_and_reshape_array("dsm_su95_rev_woGU_pos")
+    dsm_name_array = load_and_reshape_array(dsm_name)
     dsm_extend = load_and_reshape_array("dsm_extend")
 
-    numpy_to_csv(matrix = dsm_su95_rev_woGU_pos)
+    numpy_to_csv(matrix = dsm_name_array)
     numpy_to_csv(matrix = dsm_extend ,filename ="./modified_dsm_extend.csv")
