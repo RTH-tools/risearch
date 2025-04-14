@@ -2,3 +2,5 @@
 RIsearch
 __pycache__
 .ipynb_checkpoints
+RIsearch.dbg
+*.o
