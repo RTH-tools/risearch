@@ -26,6 +26,11 @@
 #include <sys/param.h>
 #include <omp.h>
 #include <errno.h>
+#include <pcre.h>
+#include <assert.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <zlib.h>
 
 #include "main.h"
 #include "sa.h"
@@ -34,7 +39,6 @@
 #include "search.h"
 #include "fasta.h"
 #include "lists.h"
-#include "zlib.h"
 
 #define min(a,b) \
     ({ __typeof__ (a) _a = (a); \
@@ -70,15 +74,16 @@ int pair_noGU[6][6] = {
 };
 
 const dsm_t *S;
-const char *fasta_raw, *suffix, *output, *query, *matrix = "t04";
+const char *completed, *fasta_raw, *suffix, *output, *query, *matrix = "t04";
 double min_energy = -20.0f;
 char **name;
 int threads = 0, seed_flag = 0, seed_orig[3] = { 6, 0, 0 }, extPen = 0;
 
 int show_alignment = 0;
 int all_vs_all=1;
-
-
+char *three_prime_opt , *five_prime_opt;
+pcre *five_prime_match = NULL;
+pcre *three_prime_match = NULL;
 int noGUseed = 0;
 double min_seed_energy_per_length = 0.0;
 int seed_mismatch[3] = { 0, 0, 0};
@@ -93,88 +98,100 @@ saidx64_t *sum_l;
 void usage(const char *cmd)
 {
 	fprintf(stderr, "\n");
-	fprintf(stderr, "================================ RIsearch2 v%s ===============================\n", version);
+	fprintf(stderr, "=============================== RIsearch2 v%s ===============================\n", version);
 	fprintf(stderr, "================ Energy based RNA-RNA interaction predictions ================\n\n");
 	fprintf(stderr, "Usage: %s [options]\n\n", cmd);
 	fprintf(stderr, "  -h,         --help\n");
 	fprintf(stderr, "                 show this message\n");
-	fprintf(stderr, "------------------------------------------------------------------------------\n");
 	fprintf(stderr, "--------------------------- SUFFIX ARRAY CREATION ----------------------------\n");
 	fprintf(stderr, "  -c <FILE>,  --create=FILE (.fa or .fa.gz)\n");
 	fprintf(stderr, "                 create suffix array for target sequence(s) together with\n");
 	fprintf(stderr, "                 their reverse complements, FASTA format, use '-' for stdin\n");
 	fprintf(stderr, "  -o <FILE>,  --output=FILE\n");
 	fprintf(stderr, "                 save created suffix array to given index file path \n");
-	fprintf(stderr, "------------------------------------------------------------------------------\n");
 	fprintf(stderr, "--------------------------- INTERACTION PREDICTION ---------------------------\n");
 	fprintf(stderr, "  -q <FILE>,  --query=FILE (.fa or .fa.gz)\n");
 	fprintf(stderr, "                 FASTA file for query sequence(s), use '-' for stdin\n");
 	fprintf(stderr, "  -i <FILE>,  --index=FILE\n");
 	fprintf(stderr, "                 pregenerated suffix array file for target sequence(s)\n");
+	fprintf(stderr, "-------------------------------- SEED OPTIONS --------------------------------\n");
 	fprintf(stderr, "  -s n:m/l,   --seed=n:m/l\n");
 	fprintf(stderr, "                 set seed length (-s l = length only; -s n:m = full interval;\n");
 	fprintf(stderr, "                 -s n:m/l = length in interval; default -s 6)\n");
+	fprintf(stderr, "  --noGUseed     consider G-U wobble pairs as mismatch within the seed\n");
+	fprintf(stderr, "                 (only for locating seeds, energy model is not affected)\n");
+	fprintf(stderr, "  -m c        --mismatch=c    Mismatched seeds with max num of mismatches (c)\n");
+	fprintf(stderr, "  -m c:p      --mismatch=c:p    min consecutive matches at seed start/end (p)\n");
+	fprintf(stderr, "  -m c:ps:pe  --mismatch=c:ps:pe or ps matches at the start & pe at the end\n");
+	fprintf(stderr, "                 These seeds will not overlap with perfect complementary seeds\n");
+	fprintf(stderr, "                 (default -m 0:0 means no mismatch                          )\n");
+	fprintf(stderr, "                 (when c>0, please set p>0 to avoid overlaps, p=c at default)\n");
+	fprintf(stderr, "  -x <float>, --seed_energy=F\n");
+	fprintf(stderr, "                 set energy per length threshold to filters seeds (default=0)\n");
+	fprintf(stderr, "------------------------------- BANDED RIsearch ------------------------------\n");
+	fprintf(stderr, "  -b band,     --band=band\n");
+	fprintf(stderr, "                 Integer, size of the bands limiting the search.\n");
+	fprintf(stderr, "                 The min size is 1; use the seed option to avoid any bulge.\n");
+	fprintf(stderr, "------------------------------- MODEL OPTIONS --------------------------------\n");
 	fprintf(stderr, "  -l <int>,   --extension=L \n");
-	fprintf(stderr, "                 max extension length(L) on the seed (do DP for max this length\n");
-	fprintf(stderr, "                 up- and downstream of seed) (default L=20)\n");
-	fprintf(stderr, "  -e <float>, --energy=dG\n");
-	fprintf(stderr, "                 set deltaG energy threshold (in kcal/mol) to filter predictions\n");
-	fprintf(stderr, "                 (default=-20)\n");
+	fprintf(stderr, "                 max extension length(L) on the seed (do DP for max this\n");
+	fprintf(stderr, "                 length up- and downstream of seed) (default L=20)\n");
 	fprintf(stderr, "  -d <int>,   --penalty=dP\n");
 	fprintf(stderr, "                 per-nucleotide extension penalty given in dacal/mol\n");
 	fprintf(stderr, "                 (recommended: 30, default: 0)\n");
-	fprintf(stderr, "  -t <int>,   --threads=N\n");
-	fprintf(stderr, "                 set maximum number of threads to use (default=1)\n");
-	fprintf(stderr, "  -3 <reg>,   --three_prime_match=PC\n");
-	fprintf(stderr, "                 report only predictions with a matching 3' PAM forward complement\n");
-	fprintf(stderr, "                 for e.g. cas9 this corresponds to PC=^(.cc|.uc|.cu) matching NGG/NAG/NGA 3' PAMs\n");
-	fprintf(stderr, "                 report mode 3/4 required\n");
-	fprintf(stderr, "  -5 <reg>,   --five_prime_match=PC\n");
-	fprintf(stderr, "                 report only predictions with a matching 5' PAM reverse complement\n");
-	fprintf(stderr, "                 for e.g. cas12a this corresponds to PC=^([^a]aaa) matching TTTV 5'PAMs\n");
-	fprintf(stderr, "                 report mode 3/4 required\n");
-	fprintf(stderr, "  -1          --one_vs_one only print results where query name matches target name\n");
-	fprintf(stderr, "  -p,         --report_alignment     \n");
-	fprintf(stderr, "                 report predictions in detailed format\n");
-	fprintf(stderr, "  -p2,        --report_alignment=2   \n");
-	fprintf(stderr, "                 report predictions in a simple format together with CIGAR-like \n");
-	fprintf(stderr, "                 string for interaction structure\n");
-	fprintf(stderr, "  -p3,        --report_alignment=3   \n");
-	fprintf(stderr, "                 report predictions in a simple format together with \n");
-	fprintf(stderr, "                 binding site (3'->5'), flanking 5'end (3'->5') and \n");
-	fprintf(stderr, "                 flanking 3'end (5'->3') sequences of the target\n");
-	fprintf(stderr, "                 (required for post-processing of CRISPR off-target predictions)\n");
-	fprintf(stderr, "  -p4,        --report_alignment=3   \n");
-	fprintf(stderr, "                 report predictions in a very short format target, start and strand + energy\n");
-	fprintf(stderr, "  --noGUseed     consider G-U wobble pairs as mismatch within the seed\n");
-	fprintf(stderr, "                 (only for locating seeds, energy model is not affected)\n");
-	fprintf(stderr, "  --verbose      verbose output\n");
-	fprintf(stderr, "  -m c        --mismatch=c       Mismatched seeds with max num of mismatches (c)\n");
-	fprintf(stderr, "  -m c:p      --mismatch=c:p      min consecutive matches at seed start/end (p)\n");
-	fprintf(stderr, "  -m c:ps:pe  --mismatch=c:ps:pe  or (ps) matches at the start & (pe) at the end\n");
-	fprintf(stderr, "                 These seeds will not overlap with perfect complementary seeds\n");
-	fprintf(stderr, "                  (default -m 0:0 means no mismatch                          )\n");
-	fprintf(stderr, "                  (when c>0, please set p>0 to avoid overlaps, p=c at default)\n");
-	fprintf(stderr, "  -x <float>, --seed_energy=F\n");
-	fprintf(stderr, "                 set energy per length threshold that filters seeds (default=0)\n");
+	fprintf(stderr, "-------------------------- ENERGY MATRIX OPTIONS -----------------------------\n");
 	fprintf(stderr, "  -z mat,     --matrix=mat\n");
 	fprintf(stderr, "                 su95 for RNA-DNA duplexes\n");
 	fprintf(stderr, "                 su95c2 for RNA-DNA duplexes modified for CRISPRoff2\n");
-	fprintf(stderr, "                 su95wk11 for RNA-DNA duplexes with mismatches open/close as loop size 2\n");
+	fprintf(stderr, "                 su95wk11 for RNA-DNA duplexes with mismatches open/close as\n");
+	fprintf(stderr, "                  loop size 2\n");
 	fprintf(stderr, "                 su95_noGU for RNA-DNA duplexes (G-T and U-G are mismatches)\n");
 	fprintf(stderr, "                 sl04_noGU for DNA-DNA duplexes (G-T is a mismatch)\n");
-	fprintf(stderr, "                 (last two models automatically activates the --noGUseed option)\n");
+	fprintf(stderr, "                  the _noGU automatically activates the --noGUseed option\n");
 	fprintf(stderr, "  -y mat2,     --matrix2=mat2\n");
 	fprintf(stderr, "                 Only needed if you design your own energy matrices\n");
-	fprintf(stderr, "  -b band,     --band=band\n");
-	fprintf(stderr, "                 Integer, size of the bands that limit the search for bulged matches.\n");
-	fprintf(stderr, "                 The minimum size is 1; please use the seed option to avoid any bulge.\n");
-	fprintf(stderr, "  -w arr,     --weights=arr\n");
-	fprintf(stderr, "                 CRISPR_gRNApPAM to weight gRNA-target interactions by CRISPR/Cas9 impact.\n");
 	fprintf(stderr, "  -K T1[,T2,T3],     --temperature=T0[,T1,T2]\n");
-	fprintf(stderr, "                 Temperatures in Kelvin for scaling of energies. T0 is the temperature to\n");
-	fprintf(stderr, "                 be scaled to. T1 and T2 are only needed if you design your own energy parameters.\n");
+	fprintf(stderr, "                 Temperatures in Kelvin for scaling of energies. T0 is\n");
+	fprintf(stderr, "                  the temperature tobe scaled to. T1 and T2 are only\n");
+	fprintf(stderr, "                  needed if you design your own energy parameters.\n");
 	fprintf(stderr, "  -M PATH,     Path to directory holding the energy matrices\n");
+	fprintf(stderr, "------------------------------- OUTPUT AND FILTERING -------------------------\n");
+	fprintf(stderr, "  -e <float>, --energy=dG\n");
+	fprintf(stderr, "                 set deltaG energy threshold in kcal/mol to filter predictions\n");
+	fprintf(stderr, "                 (default=-20 for RIsearch2)\n");
+	fprintf(stderr, "  -1          --one_vs_one\n");
+	fprintf(stderr, "                 only print results where query and target name matches\n");
+	fprintf(stderr, "  -p,         --report_alignment     \n");
+	fprintf(stderr, "                 report in detailed format\n");
+	fprintf(stderr, "  -p2,        --report_alignment=2   \n");
+	fprintf(stderr, "                 report in a simple format with CIGAR-like \n");
+	fprintf(stderr, "                 string for interaction structure\n");
+	fprintf(stderr, "  -p3,        --report_alignment=3   \n");
+	fprintf(stderr, "                 report in a simple format together with \n");
+	fprintf(stderr, "                 binding site (3'->5'), flanking 5'end (3'->5') and \n");
+	fprintf(stderr, "                 flanking 3'end (5'->3') sequences of the target\n");
+	fprintf(stderr, "                 (for post-processing of CRISPR off-target predictions)\n");
+	fprintf(stderr, "  -p4,        --report_alignment=3   \n");
+	fprintf(stderr, "                 report in the format target, start, strand, energy\n");
+	fprintf(stderr, "--------------------------- CRISPR related options ---------------------------\n");
+	fprintf(stderr, "  -3 <reg>,   --three_prime_match=PC\n");
+	fprintf(stderr, "                 report only predictions with a matching 3' PAM forward\n");
+	fprintf(stderr, "                  complement for cas9 this corresponds to PC=^(.cc|.uc|.cu)\n");
+	fprintf(stderr, "                  matching NGG/NAG/NGA 3' PAMs\n");
+	fprintf(stderr, "                  report mode 3/4 required\n");
+	fprintf(stderr, "  -5 <reg>,   --five_prime_match=PC\n");
+	fprintf(stderr, "                 report only predictions with a matching 5' PAM reverse\n");
+	fprintf(stderr, "                  complement for cas12a this corresponds to PC=^([^a]aaa)\n");
+	fprintf(stderr, "                  matching TTTV 5'PAMs\n");
+	fprintf(stderr, "                  report mode 3/4 required\n");
+	fprintf(stderr, "  -w arr,     --weights=arr\n");
+	fprintf(stderr, "                 CRISPR_gRNApPAM to weight gRNA-target interactions by\n");
+	fprintf(stderr, "                  CRISPR/Cas9 impact.\n");
+	fprintf(stderr, "  -C dir,        Move results to dir (must exists) when they are completed.\n");
+	fprintf(stderr, "--------------------------------- MISC ------------------------------------\n");
+	fprintf(stderr, "  -t <int>,   --threads=N\n");
+	fprintf(stderr, "                 set maximum number of threads to use (default=1)\n");
+	fprintf(stderr, "  --verbose      verbose output\n");
 	fprintf(stderr, "\n");
 	exit(1);
 }
@@ -231,17 +248,41 @@ void options(int argc, char *argv[])
 	};
 
 	/* parse all options */
-	while ((c = getopt_long(argc, argv, "13:5:b:c:d:e:hi:K:l:m:M:o:p::q:s:t:Uvw:x:y:z:", long_options, &option_index)) != -1) {
+	while ((c = getopt_long(argc, argv, "13:5:b:c:C:d:e:hi:K:l:m:M:o:p:q:s:t:Uvw:x:y:z:", long_options, &option_index)) != -1) {
 		switch(c) {
 			case 0:
 				break;
 			case '1':
 				all_vs_all = 0;
 			case '3':
-				/* placeholder */
+				{
+					const char *error;
+					int error_offset;
+					three_prime_opt = optarg;
+					three_prime_match = pcre_compile(optarg, 0, &error, &error_offset, NULL);
+					if (three_prime_match == 0) {
+						fprintf(stderr, "Could not compile anti-PAM regex\n");
+						err_flag = 1;
+					}
+					debug("opt: compiled_prime_match_from=%s\n", three_prime_opt);
+				}
 				break;
 			case '5':
-				/* placeholder */
+				{
+					const char *error;
+					int error_offset;
+					five_prime_opt = optarg;
+					five_prime_match = pcre_compile(optarg, 0, &error, &error_offset, NULL);
+					if (five_prime_match == 0) {
+						fprintf(stderr, "Could not compile anti-PAM regex\n");
+						err_flag = 1;
+					}
+					debug("opt: compiled_five_prime_match_from=%s\n", five_prime_opt);
+				}
+				break;
+			case 'C':
+				completed = optarg;
+				debug("opt: completed=%s\n", completed);
 				break;
 			case 'b':
 				/* placeholder */
@@ -308,6 +349,8 @@ void options(int argc, char *argv[])
 				debug("opt: output=%s\n", output);
 				break;
 			case 'p':
+				debug("opt: show_alignment=%s\n", optarg);
+				debug("opt: show_alignment=%d\n", atoi(optarg));
 				if (optarg != NULL)
 					show_alignment = atoi(optarg);
 				else
@@ -472,6 +515,7 @@ static void *match_worker(void *data)
 	{
 		int nthreads = omp_get_num_threads();
 		char tmpname[100];
+		char tmpname2[120];
 
 		for (i = 0; i < d->n_queries; i++) {
 			tid = omp_get_thread_num();
@@ -484,6 +528,7 @@ static void *match_worker(void *data)
 					debug("processing query %s \n", query->name);
 					// should probably get a basename as parameter and combine to: path/foo_{query->name} or so 
 					// possibly also warn if file is present before open "w" and overwrite what was there...
+					assert(strlen(query->name) < 80);
 					snprintf(tmpname, 100, "risearch_%s.out.gz", query->name);
 					query->out = gzopen(tmpname, "wb");
 					if (query->out == NULL) {
@@ -495,6 +540,10 @@ static void *match_worker(void *data)
 						sa_parallel_match_neg(query->qsa, 0, query->length, d->sa, 0, d->n, 0, query->seed[2], 0, 0, &query->intervals);
 						sa_evaluate_interval(query->intervals, query, d->sa, '-');
 						gzclose(query->out);
+						if (completed) {
+							snprintf(tmpname2, 120, "completed/risearch_%s.out.gz", query->name);
+							rename(tmpname, tmpname2);
+						}
 					}
 					//fprintf(stderr, "ending: %d tid: %d\n", i, tid);
 				}
@@ -540,6 +589,12 @@ int main(int argc, char *argv[])
 	debug("initializing\n");
 	getMat(matrix, &blah[0][0][0][0]);
 	S = (const dsm_t*) &blah;
+
+	if ((show_alignment != 3 && show_alignment != 4) && (three_prime_match || five_prime_match)) {
+		fprintf(stderr, "Pam matching only works with mode 3/4\n");
+		usage(argv[0]);
+		return 0;
+	}
 
 	if(fasta_raw && output) {
 		debug("creating suffix array from \"%s\"\n", fasta_raw);

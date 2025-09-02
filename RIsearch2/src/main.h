@@ -51,6 +51,7 @@ typedef struct {
 
 	char *id;
 	char *result_str;
+	char *result_short;
 	char *query_str;
 	char *aln_str;
 	char *target_str;
@@ -60,6 +61,7 @@ typedef struct {
 	char *temp_aln_str;
 	char *temp_target_str;
 	char *temp_ia_str;
+	int seed_count;
 } aln_result_t;
 
 typedef struct {

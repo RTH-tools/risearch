@@ -26,6 +26,7 @@
 #include <omp.h>
 #include <limits.h>
 #include <zlib.h>
+#include <pcre.h>
 
 #include "main.h"
 #include "sa.h"
@@ -44,13 +45,14 @@
 //extern int do_extend_seed;
 extern int show_alignment;
 extern int all_vs_all;
+extern pcre *three_prime_match;
+extern pcre *five_prime_match;
 extern int extPen;
 
 int print_debug = 0;
 int print_mats_l = 0;
 int print_mats_r = 0;
 
-//saidx64_t *seed_lengths; //array storing how many maximal seeds of each size are found; counts are incremented in the extend_seed function
 
 //reverse complements
 const char scomp[256] = {
@@ -1576,6 +1578,9 @@ print_result (char *qname, const saidx64_t * sa, const saidx64_t * qsa,
   sprintf (result_str, "%s\t%lu\t%lu\t%s\t%lu\t%lu\t%c\t%.2f",
 	   qname, result->q_new_left + 1, result->q_new_right + 1,
 	   name[idx], lpos, rpos, strand, result->energy);
+  int int_energy = (int) (result->energy * (-100.0));
+  sprintf (result -> result_short, "%s%c\t%lu\t%d\t%s", name[idx], strand, lpos,
+		  int_energy, qname);
 }
 
 void
@@ -1597,12 +1602,21 @@ really_print_alignment (gzFile qout, aln_result_t * result)
     {
       gzprintf (qout, "%s\t%s\n", result->result_str, result->ia_str);
     }
-  else if (show_alignment == 3)
-    {
-      gzprintf (qout, "%s\t%s\t%s\t%s\t%s\n", result->result_str,
-		result->ia_str, result->target_str, result->temp_target_str,
-		result->temp_ia_str);
-    }
+  else if (show_alignment == 3 || show_alignment == 4)
+  {
+	  int rc3 = 0;
+	  int rc5 = 0;
+	  if (three_prime_match)
+		  rc3 = pcre_exec (three_prime_match, NULL, result->temp_target_str, strlen (result->temp_target_str), 0, 0, NULL, 0);
+	  if (five_prime_match)
+		  rc5 = pcre_exec (five_prime_match, NULL, result->temp_ia_str, strlen (result->temp_target_str), 0, 0, NULL, 0);
+	  if (show_alignment == 3 && rc3 == 0 && rc5 == 0)
+		  gzprintf (qout, "%s\t%s\t%s\t%s\t%s\n", result->result_str,
+				  result->ia_str, result->target_str,
+				  result->temp_target_str, result->temp_ia_str);
+	  if (show_alignment == 4 && rc3 == 0 && rc5 == 0)
+		  gzprintf (qout, "%s\n", result->result_short);
+  }
   else
     {
       gzprintf (qout, "%s\n", result->result_str);
@@ -1885,7 +1899,7 @@ extend_seed (saidx64_t j,	//!< Index in target suffix array (where seed match wa
 	print_ali2 (sa, qsa, result, query_len, seed_len, M_left, Bq_left,
 		    Bt_left, M_right, Bq_right, Bt_right);
       }
-    else if (show_alignment == 3)
+    else if (show_alignment == 3 || show_alignment == 4)
       {
 	print_alignment (sa, qsa, result, query_len, seed_len, M_left,
 			 Bq_left, Bt_left, M_right, Bq_right, Bt_right);
@@ -2060,7 +2074,7 @@ sa_evaluate_interval (sa_interval_list_t * results, query_t * query,
 	  exit (EXIT_FAILURE);
 	}
     }
-  else if (show_alignment == 3)
+  else if (show_alignment == 3 || show_alignment == 4)
     {
       result->query_str = calloc (str_size, sizeof (char));
       result->temp_query_str = calloc (str_size, sizeof (char));
@@ -2086,8 +2100,16 @@ sa_evaluate_interval (sa_interval_list_t * results, query_t * query,
       exit (EXIT_FAILURE);
     }
 
+  result->result_short = calloc (1024, sizeof (char));
+  if (!result->result_short)
+    {
+      fprintf (stderr, "Failed allocating result string\n");
+      exit (EXIT_FAILURE);
+    }
+
   for (p = results; p; p = p->next)
     {
+      result->seed_count = 0;
       // the locations that match in the index
       sl = p->start;
       sr = p->end;
@@ -2193,10 +2215,24 @@ sa_evaluate_interval (sa_interval_list_t * results, query_t * query,
 //NOT critical as now all write to own file! reduces overhead that is spent waiting?
 	      {
 		if (result->found)
-		  really_print_alignment (query->out, result);
+		  {
+		    // Do not print seeds/extends for showalignment==4, just count valid ones
+		    if (show_alignment == 4)
+		      {
+			result->seed_count = result->seed_count + 1;
+			if (result->seed_count == 1)
+			  really_print_alignment (query->out, result);
+		      }
+		    else
+		      really_print_alignment (query->out, result);
+		  }
 	      }
 	    }
 	}
+
+      // print the seed only for show alignment 4
+      if (show_alignment == 4 && result->seed_count > 0)
+	gzprintf (query->out, "\t%d\n", result->seed_count);
     }
 
 
@@ -2221,7 +2257,7 @@ sa_evaluate_interval (sa_interval_list_t * results, query_t * query,
       free (result->ia_str);
       free (result->temp_ia_str);
     }
-  else if (show_alignment == 3)
+  else if (show_alignment == 3 || show_alignment == 4)
     {
       free (result->query_str);
       free (result->temp_query_str);
@@ -2233,6 +2269,7 @@ sa_evaluate_interval (sa_interval_list_t * results, query_t * query,
       free (result->temp_ia_str);
     }
   free (result->result_str);
+  free (result->result_short);
   free (result);
 }
 

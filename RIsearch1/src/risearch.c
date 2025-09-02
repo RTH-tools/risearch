@@ -28,8 +28,9 @@
 #include <getopt.h>
 #include <stdarg.h>
 #include <ctype.h>
-#include "fasta.h"
 #include <unistd.h>
+
+#include "fasta.h"
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 #define MIN(a,b) ((a)<(b)?(a):(b))
@@ -412,16 +413,14 @@ seq2ix (int len, char *seq, unsigned char *retIx, char *name, char *type)
 	default:
 	  if (isalpha (seq[i]))
 	    {
-	      fprintf (stderr,
-		       "Nonstandard nucleotide code '%c' in %s sequence '%s'. Replaced with 'N'\n",
+	      fprintf (stderr, "Nonstandard nucleotide code '%c' in %s sequence '%s'. Replaced with 'N'\n",
 		       seq[i], type, name);
 	      *(retIx + i - gapcnt) = 4;
 	      break;
 	    }
 	  else
 	    {			/*skip sequence!? */
-	      fprintf (stderr,
-		       "Unexpected character '%c' in %s sequence '%s'. Skipping sequence.\n",
+	      fprintf (stderr, "Unexpected character '%c' in %s sequence '%s'. Skipping sequence.\n",
 		       seq[i], type, name);
 	      return -1;
 	    }
@@ -483,67 +482,46 @@ index2nt (unsigned char ix)
     }
 }
 
-void
-usage (char *progname)
+void usage(char *progname)
 {
-  fprintf (stderr,
-	   "====== RIsearch1 ver 1.2 ======\n= RNA-RNA interaction search =\n");
-  fprintf (stderr,
-	   "=   Contact: wenzel@rth.dk   =\n==============================\n\n");
-  fprintf (stderr, "Usage: \t%s [ARGUMENTS]\n", progname);
-  fprintf (stderr, "\n   [INPUT]\n");
-  fprintf (stderr, "\t-q <file> Fasta file containing query sequence(s)\n");
-  fprintf (stderr,
-	   "\t-t <file> Fasta file containing target sequence(s) or specify '-t -' to pass the fasta formatted input to STDIN\n");
-  fprintf (stderr, "\t-Q <str>  Query sequence only, direct as string\n");
-  fprintf (stderr, "\t-T <str>  Target sequence as string\n");
-  fprintf (stderr,
-	   "   If q is given, Q will be ignored; same for t over T.\n");
-  fprintf (stderr, "\n   [OPTIONS]\n");
-  fprintf (stderr,
-	   "\t-d <int>  per-nucleotide extension penalty given in dacal/mol (recommended: 30, default: 0)\n");
-  fprintf (stderr,
-	   "\t-s <int>  threshold for suboptimal duplexes (minimum score, NOT energy)\n");
-  fprintf (stderr,
-	   "\t-n <int>  neighborhood (only backtrack from best position within this range - to omit many overlapping results), default is 0, backtrack all\n");
-  fprintf (stderr,
-	   "\t-f <int> force the interaction to start and end, respectively, at the 3'and 5' end of target and end at the query's 3' end. Takes input int >0.\n");
-  fprintf (stderr,
-	   "\t            Use a high value, e.g. 200*max(length(query),length(target))\n");
-  fprintf (stderr,
-	   "\t            It is currently not possible to compute weighted interactions without a fixed start and end.\n");
-  fprintf (stderr, "\t            This option requires -w.\n");
-  fprintf (stderr, "\t-l <int>  max trace back length (default: 40)\n");
-  fprintf (stderr,
-	   "\t-m <str>  matrix to use, t99 or t04(def) or su95 or su95_noGU or slh04_noGU \n");
-  fprintf (stderr,
-	   "\t-w <str>  weights vector to use, CRISPR_20nt_5p_3p or noweights. \n");
-  fprintf (stderr,
-	   "\t            Weights length mush be >= than the length of the query -1.\n");
-  fprintf (stderr,
-	   "\t            This option requires -f. Please set -f appropriately, do not try to use a low -f value to avoid the force start. \n");
-  fprintf (stderr,
-	   "\t            Launched with this option, RIsearch does not perform step 1 (memory optimization) of the algorithm (see Wenzel et al. 2012).\n");
-  fprintf (stderr, "\t-e <num>  energy threshold, checked after backtrack\n");
-  fprintf (stderr,
-	   "\t            An interaction is only printed if the predicted hybridization energy is lower than (or equal to) this threshold.\n");
-  fprintf (stderr,
-	   "\t            Also the 'best hit' per query/target pair might be filtered out, appears only once if at all (and not necessarily as first).\n");
-	fprintf(stderr,
-		"\t-1          When multiple queries and targets are given, run them one_vs_one\n");
-  fprintf (stderr,
-	   "\t-p          switch for short output, for backwards compatibility, same as -p1\n");
-  fprintf (stderr, "\t-p[1-3]     different shorter output modes:\n");
-  fprintf (stderr,
-	   "\t\t-p1     one line per hit, incl. interaction string, still header for each pair (query / target)\n");
-  fprintf (stderr,
-	   "\t\t-p2     one line per hit, tab seperated 'Qname Qbeg Qend Tname Tbeg Tend score energy'; no header; 'best' hit only once, not first\n");
-  fprintf (stderr,
-	   "\t\t-p3     one line per pair with number of hits that would have been printed, tab seperated 'Qname Tname hit-count'\n");
-  fprintf (stderr,
-	   "\t\t        without p (and with p1), the 'best' interaction (per pair) is always shown first, and repeated in the list of results\n");
-  fprintf (stderr, "\n\n");
-  exit (1);
+	fprintf(stderr, "====== RIsearch1 ver 1.2 ======\n= RNA-RNA interaction search =\n");
+	fprintf(stderr, "================ Energy based RNA-RNA interaction predictions ================\n\n");
+	fprintf(stderr, "Usage:         %s [ARGUMENTS]\n\n", progname);
+	fprintf(stderr, "   [INPUT]\n\n");
+	fprintf(stderr, "        -q <file> Fasta file containing query sequence(s)\n");
+	fprintf(stderr, "        -t <file> Fasta file containing target sequence(s) or\n");
+	fprintf(stderr, "                  specify '-t -' to pass the fasta formatted input to STDIN\n");
+	fprintf(stderr, "   [OPTIONS]\n");
+	fprintf(stderr, "  -s <int>  threshold for suboptimal duplexes (minimum score, NOT energy)\n");
+	fprintf(stderr, "  -n <int>  neighborhood (only backtrack from best position within this\n");
+	fprintf(stderr, "     range - to omit many overlapping results), default is 0, backtrack all\n");
+	fprintf(stderr, "  -f <int> force the interaction to start and end, respectively, at the 3'and\n");
+	fprintf(stderr, "     5' end of target and end at the query's 3' end. Takes input int >0.\n");
+	fprintf(stderr, "     Use a high value, e.g. 200*max(length(query),length(target))\n");
+	fprintf(stderr, "     It is currently not possible to compute weighted interactions without a fixed start and end.\n");
+	fprintf(stderr, "     This option requires -w.\n");
+	fprintf(stderr, "  -l <int>  max trace back length (default: 40)\n");
+	fprintf(stderr, "  -m <str>  matrix to use, t99 or t04(def) or su95 or su95_noGU or slh04_noGU \n");
+	fprintf(stderr, "  -w <str>  weights vector to use, CRISPR_20nt_5p_3p or noweights. \n");
+	fprintf(stderr, "     Weights length mush be >= than the length of the query -1.\n");
+	fprintf(stderr, "     This option requires -f. Please set -f appropriately, do not try to\n");
+	fprintf(stderr, "     use a low -f value to avoid the force start. \n");
+	fprintf(stderr, "     Launched with this option, RIsearch does not perform step 1 (memory optimization) of \n");
+	fprintf(stderr, "     the algorithm (see Wenzel et al. 2012).\n");
+	fprintf(stderr, "  -d <int>,   --penalty=dP\n");
+	fprintf(stderr, "                 per-nucleotide extension penalty given in dacal/mol\n");
+	fprintf(stderr, "                 (recommended: 30, default: 0)\n");
+	fprintf(stderr, "  -e <float>, --energy=dG\n");
+	fprintf(stderr, "                 set deltaG energy threshold (in kcal/mol) to filter predictions\n");
+	fprintf(stderr, "                 (default=-20 for RIsearch2)\n");
+	fprintf(stderr, "  -1        When multiple queries and targets are given, run them one_vs_one\n");
+	fprintf(stderr, "  -p        switch for short output, for backwards compatibility, same as -p1\n");
+	fprintf(stderr, "  -p1       one line per hit, incl. interaction string, still header for each pair (query / target)\n");
+	fprintf(stderr, "  -p2       one line per hit, tab seperated 'Qname Qbeg Qend Tname Tbeg Tend score energy'; no header; 'best' hit only once, not first\n");
+	fprintf(stderr, "  -p3       one line per pair with number of hits that would have been printed, tab seperated 'Qname Tname hit-count'\n");
+	fprintf(stderr, "      without p (and with p1), the 'best' interaction (per pair) is always shown first, and repeated in the list of results\n");
+	fprintf(stderr, "\n\n");
+	exit(1);
 }
 
 void
@@ -612,14 +590,12 @@ getArgs (int argc, char *argv[])
 
   if (!((seq1file_name || seq1_cli) && (seq2file_name || seq2_cli)))
     {
-      fprintf (stderr,
-	       "\nYou need to provide a query (see -Q or -q option) and a target (-T/-t)\n\n");
+      fprintf (stderr, "\nYou need to provide a query (see -Q or -q option) and a target (-T/-t)\n\n");
       usage (argv[0]);
     }
   if (seq1file_name && (!strcmp (seq1file_name, "-")))
     {
-      fprintf (stderr,
-	       "\nQuery can currently not be read from STDIN, only target can!\n\n");
+      fprintf (stderr, "\nQuery can currently not be read from STDIN, only target can!\n\n");
       usage (argv[0]);
     }
 }
@@ -1206,8 +1182,7 @@ RIs (unsigned char *qseq,	/* query sequence - numeric representation */
   k = maxk;			/* 0-1-2 M Ix Iy - should always be 0 to begin with */
   if (k != 0)
     {
-      fprintf (stderr,
-	       "\nErr: Found highest value in one of the gap matrices (k=%d)!?\n\n",
+      fprintf (stderr, "\nErr: Found highest value in one of the gap matrices (k=%d)!?\n\n",
 	       k);
     }
 
@@ -1340,8 +1315,7 @@ RIs (unsigned char *qseq,	/* query sequence - numeric representation */
 	  else if (Ix[i][j] == dsm[GAP][qseq[i - 1]][GAP][GAP])
 	    {
 	      k = 3;		/* start new alignment with gap; not possible, prevented by scoring... */
-	      fprintf (stderr,
-		       "\nErr: This alignment starts in a gap - not even an option!?\n");
+	      fprintf (stderr, "\nErr: This alignment starts in a gap - not even an option!?\n");
 	      hit->ali_seq1[l] = index2nt (qseq[--i]);
 	      hit->ali_ia[l] = ' ';
 	      hit->ali_seq2[l++] = '-';
@@ -1349,7 +1323,7 @@ RIs (unsigned char *qseq,	/* query sequence - numeric representation */
 	    }
 	  else
 	    {
-	      printf ("unexpected case in k=1 : %d\n", Ix[i][j]);
+	      fprintf (stderr, "unexpected case in k=1 : %d\n", Ix[i][j]);
 	    }
 	  hit->ali_seq1[l] = index2nt (qseq[--i]);
 	  hit->ali_ia[l] = ' ';
@@ -1371,8 +1345,7 @@ RIs (unsigned char *qseq,	/* query sequence - numeric representation */
 	  else if (Iy[i][j] == dsm[GAP][GAP][GAP][tseq[j - 1]])
 	    {
 	      k = 3;		/* start new alignment - with gap LEGAL!? */
-	      fprintf (stderr,
-		       "\nErr: This alignment starts in a gap - not even an option!?\n");
+	      fprintf (stderr, "\nErr: This alignment starts in a gap - not even an option!?\n");
 	      hit->ali_seq1[l] = '-';
 	      hit->ali_ia[l] = ' ';
 	      hit->ali_seq2[l++] = index2nt (tseq[--j]);
@@ -1380,7 +1353,7 @@ RIs (unsigned char *qseq,	/* query sequence - numeric representation */
 	    }
 	  else
 	    {
-	      printf ("unexpected case in k=2 : %d\n", Iy[i][j]);
+	      fprintf (stderr, "unexpected case in k=2 : %d\n", Iy[i][j]);
 	    }
 	  hit->ali_seq1[l] = '-';
 	  hit->ali_ia[l] = ' ';
@@ -1727,6 +1700,10 @@ RIs_linSpace (unsigned char *qseq,	/* query sequence - numeric representation */
 
       if (rowMax_score > maxval)
 	{
+#if VERBOSE > 1
+	  printf ("updating maxval 1557 from %d to %d\n", maxval,
+		  rowMax_score);
+#endif
 	  maxval = rowMax_score;
 	  maxi = rowMax_pos;
 	  maxj = j;
@@ -2082,8 +2059,7 @@ RIs_force_start_end_init (unsigned char *qseqIx,	/* query sequence - numeric rep
     }
   if (strcmp (pos_weights, "noweights") && force_start_val == 0)
     {
-      fprintf (stderr,
-	       "ERR: weighted interactions must be forced to start at position 0 in the target. Please increase -f parameter, or use array \"noweights\" for option -w.\n");
+      fprintf (stderr, "ERR: weighted interactions must be forced to start at position 0 in the target. Please increase -f parameter, or use array \"noweights\" for option -w.\n");
       exit (1);
     }
   if (!strcmp (pos_weights, "CRISPR_20nt_5p_3p"))
@@ -2092,8 +2068,7 @@ RIs_force_start_end_init (unsigned char *qseqIx,	/* query sequence - numeric rep
       extern int size_wC20_5p_3p;
       if (size_wC20_5p_3p < len_seq1 - 1)
 	{
-	  fprintf (stderr,
-		   "ERR: the array of weights is too short for the given query.\n Weights length mush be >= than the length of the query -1.\n");
+	  fprintf (stderr, "ERR: the array of weights is too short for the given query.\n Weights length mush be >= than the length of the query -1.\n");
 	  exit (1);
 	}
       if (size_wC20_5p_3p == len_seq1 - 1)
@@ -2135,8 +2110,7 @@ RIs_force_start_end_init (unsigned char *qseqIx,	/* query sequence - numeric rep
     }
   else
     {
-      fprintf (stderr,
-	       "Undefined weights array. Existing weights verctors are CRISPR_20nt_5p_3p and noweights. To add a new weights vector, create an array in weights.c and an ad-hoc if clause. Use noweights to set all weights to 1.\n");
+      fprintf (stderr, "Undefined weights array. Existing weights verctors are CRISPR_20nt_5p_3p and noweights. To add a new weights vector, create an array in weights.c and an ad-hoc if clause. Use noweights to set all weights to 1.\n");
       exit (1);
     }
 }
@@ -2339,8 +2313,7 @@ RIs_force_start_end_weighted (unsigned char *qseq,	/* query sequence - numeric r
 		       && j != 1)
 		{		/*      started new alignment */
 		  /*printf("means we started alignment at row [%d] col [%d] of matrix %d \n", i, j, k); */
-		  fprintf (stderr,
-			   "Force start option did not work: try to increase the number given to -f.\nTry with a number > %d\n",
+		  fprintf (stderr, "Force start option did not work: try to increase the number given to -f.\nTry with a number > %d\n",
 			   max3 (2000, m * 500, n * 500));
 		  exit (1);
 		}
@@ -2374,8 +2347,7 @@ RIs_force_start_end_weighted (unsigned char *qseq,	/* query sequence - numeric r
 		       (dsm[GAP][qseq[i - 1]][GAP][tseq[j - 1]]) +
 		       force_start_val && j != 1)
 		{		/*      started new alignment */
-		  fprintf (stderr,
-			   "Force start option did not work: try to increase the number given to -f.\nTry with a number > %d\n",
+		  fprintf (stderr, "Force start option did not work: try to increase the number given to -f.\nTry with a number > %d\n",
 			   max3 (2000, m * 500, n * 500));
 		  exit (1);
 		}
@@ -2421,8 +2393,7 @@ RIs_force_start_end_weighted (unsigned char *qseq,	/* query sequence - numeric r
 		    }
 		  else
 		    {
-		      fprintf (stderr,
-			       "ERR: unexpected case in k=1 : %f in row %d and col %d\n",
+		      fprintf (stderr, "ERR: unexpected case in k=1 : %f in row %d and col %d\n",
 			       Ix[i][j], i, j);
 		      exit (1);
 		    }
@@ -2487,8 +2458,7 @@ RIs_force_start_end_weighted (unsigned char *qseq,	/* query sequence - numeric r
 	{
 	  if (j > 0)
 	    {
-	      fprintf (stderr,
-		       "Force start option did not work: try to increase the number given to -f.\nTry with a number > %d.\n",
+	      fprintf (stderr, "Force start option did not work: try to increase the number given to -f.\nTry with a number > %d.\n",
 		       (int) max3 (2000, m * 200, n * 200));
 	      exit (1);
 	    }
