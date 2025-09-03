@@ -39,6 +39,7 @@
 #include "search.h"
 #include "fasta.h"
 #include "lists.h"
+#include "weights.h"
 
 #define min(a,b) \
     ({ __typeof__ (a) _a = (a); \
@@ -74,10 +75,18 @@ int pair_noGU[6][6] = {
 };
 
 const dsm_t *S;
-const char *completed, *fasta_raw, *suffix, *output, *query, *matrix = "t04";
+const char *completed, *fasta_raw, *suffix, *output, *query;
+const char *matname = "t04", *matname2 = NULL;
+const char *matpath = MATPATH;
 double min_energy = -20.0f;
+float tempK[3] = {
+	TEMPERATURE1, /* temperature to scale to */
+	TEMPERATURE1, /* temperature valid for matname */
+	TEMPERATURE2  /* temperature valid for matname2 */
+};
 char **name;
 int threads = 0, seed_flag = 0, seed_orig[3] = { 6, 0, 0 }, extPen = 0;
+int bands_flag = 0, bands = 0;
 
 int show_alignment = 0;
 int all_vs_all=1;
@@ -93,6 +102,11 @@ int max_ext_len = 20;
 saidx64_t *idx_lengths;
 saidx64_t num_idxs;
 saidx64_t *sum_l;
+
+int weight_stacks = 0;
+char *weights_arr_name;
+float *weights;
+
 
 /* usage information */
 void usage(const char *cmd)
@@ -285,7 +299,14 @@ void options(int argc, char *argv[])
 				debug("opt: completed=%s\n", completed);
 				break;
 			case 'b':
-				/* placeholder */
+				// bands
+				bands_flag = 1;
+				bands = atoi(optarg);
+				if (bands < 1) {
+					fprintf(stderr, "Invalid bands parameter. Please use a positive integer > 0.\n");
+					abort();
+				}
+				debug("opt: bands param =(%d)\n", bands);
 				break;
 			case 'c':
 				fasta_raw = optarg;
@@ -312,7 +333,20 @@ void options(int argc, char *argv[])
 				debug("opt: suffix=%s\n", suffix);
 				break;
 			case 'K':
-				/* placeholder */
+				{
+					char *next;
+					char *tmp = optarg;
+					int i = 0;
+					debug("opt: temperatures=%s\n", optarg);
+					next = strtok(tmp, ",");
+					while (next && i < 3) {
+						debug("opt: next=%s\n", next);
+						tempK[i]  = atof(next);
+						next = strtok(NULL, ",");
+						i++;
+					}
+					debug("opt: temperatures=(%f, %f, %f)\n", tempK[0], tempK[1], tempK[2]);
+				}
 				break;
 			case 'l':
 				max_ext_len = MAX(0, atoi(optarg));
@@ -342,7 +376,8 @@ void options(int argc, char *argv[])
 				debug("opt: seed_mismatch=(%d,%d,%d)\n", seed_mismatch[0], seed_mismatch[1], seed_mismatch[2]);
 				break;
 			case 'M':
-				/* placeholder */
+				matpath = strdup(optarg);
+				debug("opt: matpath=%s\n", matpath);
 				break;
 			case 'o':
 				output = optarg;
@@ -392,7 +427,8 @@ void options(int argc, char *argv[])
 				verbose = 1;
 				break;
 			case 'w':
-				/* placeholder */
+				weight_stacks = 1;
+				weights_arr_name = optarg;
 				break;
 			case 'x':
 				seed_threshold_flag=1;
@@ -400,14 +436,15 @@ void options(int argc, char *argv[])
 				debug("opt: min_seed_energy_per_length=%f\n", min_seed_energy_per_length);
 				break;
 			case 'y':
-				/* placeholder */
+				matname2 = optarg;
+				debug("opt: matrix2=%s\n", matname2);
 				break;
 			case 'z':
-				matrix = strdup(optarg);
-				debug("opt: matrix=%s\n", matrix);
+				matname = optarg;
+				debug("opt: matrix=%s\n", matname);
 				break;
 			case '?':
-				fprintf(stderr, "Parameter -%c ignored: unknown option or missing argument.\n", optopt);
+				fprintf(stderr, "Parameter -%c: unknown option or missing argument.\n", optopt);
 				err_flag = 1;
 				break;
 		}
@@ -419,40 +456,19 @@ void options(int argc, char *argv[])
 	}
 }
 
-/** @brief Initializes RIsearch energy scoring matrix incl extension
- *  @param matname The name of the dsm matrix to use
- *  @param bA_nu The address to which the combined matrix will be written
- *  @return 0 upon success
- */
-int getMat(const char *matname, int *bA_nu)
-{
-	const int *bA_bas, *bA_ext;
-	int i;
-	if (! strcmp (matname, "t04")) {
-		bA_bas = &dsm_t04_pos[0][0][0][0];
-	} else if (! strcmp (matname, "t99")) { 
-		bA_bas = &dsm_t99_pos[0][0][0][0];
-	} else {
-		// There comes the energy matrix parsing code in the future
-		// parse the input file for energy matrix
-		
-		fprintf(stderr, "Undefined matrix, -m needs to be set to either t99 or t04\n");
-		exit(1);
-	}
-	bA_ext = &dsm_extend_pos[0][0][0][0];
 
-	/* create dsm from   dsm_base - d * dsm_extend   */
-	for (i=0; i<1296; i++) {
-		*(bA_nu+i) = *(bA_bas+i) - extPen * *(bA_ext+i); /* bA_nu[i] =  ... also works */
-		/*
-		//print dsm
-		fprintf(stderr, "%5d", *(bA_nu+i));
-		if((i+1)%36  == 0 ) {
-		fprintf(stderr, "\n");
-		}
-		*/
-	}
-	return 0;
+void getWeights(char *weigths_arr_name)
+{
+    if (!strcmp(weigths_arr_name, "CRISPR_gRNApPAM")){
+        weights = (float *) malloc(size_wC23_3p_5p*sizeof(float));
+        for(int i = 0; i < size_wC23_3p_5p; ++i){
+            weights[i] = wC23_3p_5p[i];
+        }
+    }
+    else{
+        fprintf(stderr, "Undefined name for array of weights\n");
+		exit(EXIT_FAILURE);
+    }
 }
 
 /** @brief Reads queries from fasta file and sets it up
@@ -538,7 +554,12 @@ static void *match_worker(void *data)
 					//fprintf(stderr, "starting: %d tid: %d len: %d\n", i, tid, query->length);
 					else if (query->length >= query->seed[2]) {
 						sa_parallel_match_neg(query->qsa, 0, query->length, d->sa, 0, d->n, 0, query->seed[2], 0, 0, &query->intervals);
-						sa_evaluate_interval(query->intervals, query, d->sa, '-');
+						if (!weight_stacks){
+						    sa_evaluate_interval(query->intervals, query, d->sa, '-');
+						}
+						else{
+						    sa_evaluate_interval_weighted(query->intervals, query, d->sa, '-');
+						}
 						gzclose(query->out);
 						if (completed) {
 							snprintf(tmpname2, 120, "completed/risearch_%s.out.gz", query->name);
@@ -582,13 +603,11 @@ int main(int argc, char *argv[])
 	saidx64_t *sa, n;
 	fasta_t *ffp;
 	int i;
-	dsm_t blah;
+	dsm_t dsm;
 
 	options(argc, argv);
 
 	debug("initializing\n");
-	getMat(matrix, &blah[0][0][0][0]);
-	S = (const dsm_t*) &blah;
 
 	if ((show_alignment != 3 && show_alignment != 4) && (three_prime_match || five_prime_match)) {
 		fprintf(stderr, "Pam matching only works with mode 3/4\n");
@@ -600,6 +619,11 @@ int main(int argc, char *argv[])
 		debug("creating suffix array from \"%s\"\n", fasta_raw);
 		sa_fasta_to_file(fasta_raw, output);
 	} else if(suffix && query) {
+		getMat(matname, matname2, matpath, tempK, &dsm[0][0][0][0]);
+		if (weight_stacks == 1){
+		    getWeights(weights_arr_name);
+		}
+		S = (const dsm_t*) &dsm;
 		debug("reading suffix array from \"%s\"\n", suffix);
 		sa_read(suffix, &sa, &n, &idx_lengths, &sum_l, &num_idxs, &name);
 		// n is twice the number of nucleotides in input, because of reverse complement

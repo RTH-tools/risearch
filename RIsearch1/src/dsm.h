@@ -1,5 +1,4 @@
 /*********************************************************************
-  RIsearch2   --   RNA-RNA interaction search
 
   Copyright (c) 2016 by the contributors (see AUTHORS file)
 
@@ -19,18 +18,34 @@
   along with RIsearch, see file COPYING.
   If not, see <http://www.gnu.org/licenses/>.
 *********************************************************************/
-#ifndef __SEARCH_H__
-#define __SEARCH_H__ 1
+#ifndef __DSM_H__
+#define __DSM_H__
 
-#include "main.h"
-#include "sa.h"
-#include "lists.h"
-
-extern saidx64_t sa_search_left(const saidx64_t *sa, saidx64_t start, saidx64_t end, saidx64_t offset, saint_t c);
-extern void sa_search_interval(const saidx64_t *sa, saidx64_t start, saidx64_t end, saidx64_t offset, saidx64_t interval[6]);
-extern void sa_evaluate_interval(sa_interval_list_t *results, query_t *query, const saidx64_t *sa, char strand);
-extern void sa_evaluate_interval_weighted(sa_interval_list_t * results, query_t * query, const saidx64_t * sa, char strand);
-extern void sa_parallel_match_neg(const saidx64_t *qsa, saidx64_t ql, saidx64_t qr, const saidx64_t *sa, saidx64_t sl, saidx64_t sr, saidx64_t offset, saidx64_t depth, int last_match_count, int mismatch_count, sa_interval_list_t **results);
-
+#if RISVERSION == 2
+ /* position of '-' in alphabet, not as define if read from matrix... */
+#define GAP 0
+#define MATVERSION 2
+#elif RISVERSION == 1
+/* position of '-' in alphabet, not as define if read from matrix... */
+#define GAP 5
+#define MATVERSION 1
 #endif
 
+/* dsm size */
+#define DSM_N 6
+#define DSM_DIM 6*6*6*6
+#define DSM_N_F 1
+#define SCALEFACTOR 10000.0
+
+#define TEMPERATURE1 310.15
+#define TEMPERATURE2 273.15
+
+typedef int dsm_t[DSM_N][DSM_N][DSM_N][DSM_N];
+typedef float dsmf_t[DSM_N][DSM_N][DSM_N][DSM_N];
+
+extern int dsm_offset;
+extern dsm_t dsm_T;
+extern dsm_t dsm_extend;
+extern void getMat(const char *matname, const char *matname2, const char *matpath, float *T, int *bA_nu);
+extern int extPen;
+#endif

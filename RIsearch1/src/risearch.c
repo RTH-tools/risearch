@@ -31,11 +31,12 @@
 #include <unistd.h>
 
 #include "fasta.h"
+#include "dsm.h"
+#include "main.h"
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 #define MIN(a,b) ((a)<(b)?(a):(b))
 #define NEGINF INT_MIN/2
-#define GAP 5			/* position of '-' in alphabet, not as define if read from matrix... */
 
 typedef struct
 {
@@ -45,10 +46,8 @@ typedef struct
 } IA;
 
 int RIs_linSpace (unsigned char *qseq, unsigned char *tseq, int m, int n,
-		  short dsm[6][6][6][6], int extensionpenalty, int threshold,
-		  char *qname, char *tname, char *matname);
+		  dsm_t dsm, int extensionpenalty, int threshold, const char *qname, const char *tname, const char *matname);
 int reverse (char *s, int len);
-int getMat (char *matname, short *bA_nu);
 int getWeights (char *arrayname, float *weights);
 void printMat (int **mat, int rows, int cols, unsigned char *seq1,
 	       unsigned char *seq2);
@@ -56,20 +55,19 @@ int seq2ix (int len, char *seq, unsigned char *retIx, char *name, char *type);
 unsigned char nt2index (char nt);
 char index2nt (unsigned char ix);
 void usage (char *progname);
-void getArgs (int argc, char *argv[]);
+void options (int argc, char *argv[]);
 int **allocIntMatrix (int rows, int cols);
 float **allocFloatMatrix (int rows, int cols);
 void freeIntMatrix (int **m, int rows);
 void freeFloatMatrix (float **m, int rows);
-void RIs (unsigned char *qseq, unsigned char *tseq, int m, int n,
-	  short dsm[6][6][6][6], IA * hit);
+void RIs (unsigned char *qseq, unsigned char *tseq, int m, int n, dsm_t dsm,
+	  IA * hit);
 void RIs_force_start_end_init (unsigned char *qseqIx, unsigned char *tseqIx,
-			       int len_seq1, int len_seq2,
-			       short dsm[6][6][6][6], char *matname);
+			       int len_seq1, int len_seq2, dsm_t dsm,
+			       const char *matname);
 void RIs_force_start_end_weighted (unsigned char *qseq, unsigned char *tseq,
-				   int m, int n, float *weights,
-				   short dsm[6][6][6][6], IA * hit,
-				   char *matname);
+				   int m, int n, float *weights, dsm_t dsm,
+				   IA * hit, const char *matname);
 int min2 (int a, int b);
 int max3 (int a, int b, int c);
 int max4 (int a, int b, int c, int d);
@@ -78,14 +76,22 @@ float max3f (float a, float b, float c);
 float max4f (float a, float b, float c, float d);
 float max5f (float a, float b, float c, float d, float e);
 float find_max_value_f (float **M_col, float **Ix_col, float **Iy_col, int *k,
-			int *i, int j, int n, short dsm[6][6][6][6],
-			unsigned char *qseq, unsigned char *tseq);
+			int *i, int j, int n, dsm_t dsm, unsigned char *qseq,
+			unsigned char *tseq);
 char *allocate_char_array (int length);
 void set_alignment_symbols (char query_nt, char target_nt,
 			    char *query_alignment, char *target_alignment);
 
 /* values to be overwritten by command line parameters */
-char *mat_name = "t04", *seq1file_name, *seq2file_name, *seq1_cli, *seq2_cli;
+const char *matname = "t04", *matname2 = NULL;
+const char *matpath = MATPATH;
+float tempK[3] = {
+	TEMPERATURE1, /* temperature to scale to */
+	TEMPERATURE1, /* temperature valid for matname */
+	TEMPERATURE2  /* temperature valid for matname2 */
+};
+
+char *seq1file_name, *seq2file_name, *seq1_cli, *seq2_cli;
 int tblen = 40;			/* trace-back length, that many nucleotides before 'maxHit' */
 int extPen = 0;			/* extension penalty; used to compute dsm */
 int force_start_val = -1;	/* values used to unitialize the first column of the M matrix. If sufficiently high, can force the interaction to start at position 0 of the DNA. */
@@ -99,6 +105,8 @@ int doSubopt = 0;		/* flag : minScore in use */
 int filterE = 0;		/* flag : filterE in use */
 int weighted_positions = 0;	/*true if each position of interaction has a certain weight. */
 char *pos_weights = "CRISPR_20nt_3p_5p";	/*name of the array being used to assign weights to positions */
+float temperatureK = TEMPERATURE1;
+int verbose = 0;		/* verbose flag */
 
 int main(int argc, char *argv[])
 {
@@ -107,13 +115,13 @@ int main(int argc, char *argv[])
 	unsigned char *qseqIx, *tseqIx;
 	FASTAFILE *ffpQ, *ffpT;	/*for query/target respectively */
 	char *nameQ, *nameT;
-	short dsm[6][6][6][6];
+	dsm_t dsm;
 	int check;
 	int count_q = 0, count_t = 0;
 
-	getArgs(argc, argv);
+	options(argc, argv);
 
-	getMat(mat_name, &dsm[0][0][0][0]);
+	getMat(matname, matname2, matpath, tempK, &dsm[0][0][0][0]);
 
 	if (seq2file_name) {	/* target given as file - or STDIN */
 		ffpT = OpenFASTA(seq2file_name);
@@ -169,11 +177,11 @@ int main(int argc, char *argv[])
 							exit(1);
 						}
 						if (all_vs_all || count_t == count_q) {
-							RIs_force_start_end_init(qseqIx, tseqIx, len_seq1, len_seq2, dsm, mat_name);
+							RIs_force_start_end_init(qseqIx, tseqIx, len_seq1, len_seq2, dsm, matname);
 						}
 					} else {
 						if (all_vs_all || count_t == count_q) {
-							RIs_linSpace(qseqIx, tseqIx, len_seq1, len_seq2, dsm, extPen, minScore, nameQ, nameT, mat_name);
+							RIs_linSpace(qseqIx, tseqIx, len_seq1, len_seq2, dsm, extPen, minScore, nameQ, nameT, matname);
 						}
 					}
 					free(qseqIx);
@@ -204,9 +212,9 @@ int main(int argc, char *argv[])
 						fprintf(stderr, "Options -d -s -n -l -e -p are not available in combination with options -f -w \n");
 						exit(1);
 					}
-					RIs_force_start_end_init(qseqIx, tseqIx, len_seq1, len_seq2, dsm, mat_name);
+					RIs_force_start_end_init(qseqIx, tseqIx, len_seq1, len_seq2, dsm, matname);
 				} else {
-					RIs_linSpace(qseqIx, tseqIx, len_seq1, len_seq2, dsm, extPen, minScore, "from_cli", nameT, mat_name);
+					RIs_linSpace(qseqIx, tseqIx, len_seq1, len_seq2, dsm, extPen, minScore, "from_cli", nameT, matname);
 				}
 				free(qseqIx);
 
@@ -263,9 +271,9 @@ int main(int argc, char *argv[])
 						fprintf(stderr, "Options -d -s -n -l -e -p are not available in combination with options -f -w \n");
 						exit(1);
 					}
-					RIs_force_start_end_init(qseqIx, tseqIx, len_seq1, len_seq2, dsm, mat_name);
+					RIs_force_start_end_init(qseqIx, tseqIx, len_seq1, len_seq2, dsm, matname);
 				} else {
-					RIs_linSpace(qseqIx, tseqIx, len_seq1, len_seq2, dsm, extPen, minScore, nameQ, "from_cli", mat_name);
+					RIs_linSpace(qseqIx, tseqIx, len_seq1, len_seq2, dsm, extPen, minScore, nameQ, "from_cli", matname);
 				}
 				free(qseqIx);
 				free(nameQ);
@@ -296,9 +304,9 @@ int main(int argc, char *argv[])
 					fprintf(stderr, "Options -d -s -n -l -e -p are not available in combination with options -f -w \n");
 					exit(1);
 				}
-				RIs_force_start_end_init(qseqIx, tseqIx, len_seq1, len_seq2, dsm, mat_name);
+				RIs_force_start_end_init(qseqIx, tseqIx, len_seq1, len_seq2, dsm, matname);
 			} else {
-				RIs_linSpace(qseqIx, tseqIx, len_seq1, len_seq2, dsm, extPen, minScore, "from_cli", "from_cli", mat_name);
+				RIs_linSpace(qseqIx, tseqIx, len_seq1, len_seq2, dsm, extPen, minScore, "from_cli", "from_cli", matname);
 			}
 			free(qseqIx);
 		} else {
@@ -511,139 +519,116 @@ void usage(char *progname)
 	fprintf(stderr, "  -d <int>,   --penalty=dP\n");
 	fprintf(stderr, "                 per-nucleotide extension penalty given in dacal/mol\n");
 	fprintf(stderr, "                 (recommended: 30, default: 0)\n");
-	fprintf(stderr, "  -e <float>, --energy=dG\n");
+	fprintf(stderr, "  -e <flt> --energy=dG\n");
 	fprintf(stderr, "                 set deltaG energy threshold (in kcal/mol) to filter predictions\n");
 	fprintf(stderr, "                 (default=-20 for RIsearch2)\n");
+
 	fprintf(stderr, "  -1        When multiple queries and targets are given, run them one_vs_one\n");
 	fprintf(stderr, "  -p        switch for short output, for backwards compatibility, same as -p1\n");
-	fprintf(stderr, "  -p1       one line per hit, incl. interaction string, still header for each pair (query / target)\n");
-	fprintf(stderr, "  -p2       one line per hit, tab seperated 'Qname Qbeg Qend Tname Tbeg Tend score energy'; no header; 'best' hit only once, not first\n");
-	fprintf(stderr, "  -p3       one line per pair with number of hits that would have been printed, tab seperated 'Qname Tname hit-count'\n");
+	fprintf(stderr, "  -p1     one line per hit, incl. interaction string, still header for each pair (query / target)\n");
+	fprintf(stderr, "  -p2     one line per hit, tab seperated 'Qname Qbeg Qend Tname Tbeg Tend score energy'; no header; 'best' hit only once, not first\n");
+	fprintf(stderr, "  -p3     one line per pair with number of hits that would have been printed, tab seperated 'Qname Tname hit-count'\n");
 	fprintf(stderr, "      without p (and with p1), the 'best' interaction (per pair) is always shown first, and repeated in the list of results\n");
+	fprintf(stderr, "  --verbose      verbose output\n");
 	fprintf(stderr, "\n\n");
 	exit(1);
 }
 
-void
-getArgs (int argc, char *argv[])
+void options(int argc, char *argv[])
 {
-  char c;
-  while ((c = getopt (argc, argv, "1q:t:Q:T:d:X:m:s:e:n:w:l:f:p::")) != -1)
-    switch (c)
-      {
+	char c;
+	while ((c = getopt(argc, argv, "1vq:t:Q:T:d:M:K:y:z:m:s:e:n:w:l:f:p::")) != -1)
+		switch (c) {
 		case '1':
 			all_vs_all = 0;
 			break;
-      case 'q':
-	seq1file_name = optarg;
-	break;
-      case 't':
-	seq2file_name = optarg;
-	break;
-      case 'Q':
-	seq1_cli = optarg;
-	break;
-      case 'T':
-	seq2_cli = optarg;
-	break;
-      case 'd':
-	extPen = atoi (optarg);
-	break;
-      case 'X':
-	break;			/*silent var */
-      case 'm':
-	mat_name = optarg;
-	break;
-      case 's':
-	minScore = atoi (optarg);
-	doSubopt = 1;
-	break;
-      case 'e':
-	maxEnergy = atof (optarg);
-	filterE = 1;
-	break;
-      case 'n':
-	vicinity = atoi (optarg);
-	break;
-      case 'w':
-	weighted_positions = 1;
-	pos_weights = optarg;
-	break;
-      case 'l':
-	tblen = atoi (optarg);
-	break;
-      case 'f':
-	force_start_val = atoi (optarg);
-	break;
-      case 'p':
-	if (optarg)
-	  printShort = atoi (optarg);
-	else
-	  printShort = 1;
-	break;
-      case '?':
-	usage (argv[0]);
-	break;
-      default:
-	abort ();
-      }
+		case 'v':
+			verbose = 1;
+			break;
+		case 'q':
+			seq1file_name = optarg;
+			break;
+		case 't':
+			seq2file_name = optarg;
+			break;
+		case 'Q':
+			seq1_cli = optarg;
+			break;
+		case 'T':
+			seq2_cli = optarg;
+			break;
+		case 'd':
+			extPen = atoi(optarg) * SCALEFACTOR / 100;
+			break;
+		case 'M':
+			matpath = optarg;
+			break;
+		case 'y':
+			matname2 = optarg;
+			break;
+		case 'm':
+			fprintf(stderr, "Parameter -m is deprecated, please use -z.\n");
+			matname = optarg;
+			break;
+		case 'z':
+			matname = optarg;
+			break;
+		case 'K':
+			{
+				char *next;
+				char *tmp = optarg;
+				int i = 0;
+				next = strtok(tmp, ",");
+				while (next && i < 3) {
+					tempK[i] = atof(next);
+					next = strtok(NULL, ",");
+					i++;
+				}
+			}
+			break;
+		case 's':
+			minScore = atoi(optarg);
+			doSubopt = 1;
+			break;
+		case 'e':
+			maxEnergy = atof(optarg);
+			filterE = 1;
+			break;
+		case 'n':
+			vicinity = atoi(optarg);
+			break;
+		case 'w':
+			weighted_positions = 1;
+			pos_weights = optarg;
+			break;
+		case 'l':
+			tblen = atoi(optarg);
+			break;
+		case 'f':
+			force_start_val = atoi(optarg);
+			break;
+		case 'p':
+			if (optarg)
+				printShort = atoi(optarg);
+			else
+				printShort = 1;
+			break;
+		case '?':
+			fprintf(stderr, "Parameter -%c: unknown option or missing argument.\n", optopt);
+			usage(argv[0]);
+			break;
+		default:
+			abort();
+		}
 
-  if (!((seq1file_name || seq1_cli) && (seq2file_name || seq2_cli)))
-    {
-      fprintf (stderr, "\nYou need to provide a query (see -Q or -q option) and a target (-T/-t)\n\n");
-      usage (argv[0]);
-    }
-  if (seq1file_name && (!strcmp (seq1file_name, "-")))
-    {
-      fprintf (stderr, "\nQuery can currently not be read from STDIN, only target can!\n\n");
-      usage (argv[0]);
-    }
-}
-
-int
-getMat (char *matname, short *bA_nu)
-{
-  short *bA_bas, *bA_ext;
-  int i;
-  extern short dsm_extend[6][6][6][6];
-  if (!strcmp (matname, "t04"))
-    {
-      extern short dsm_t04[6][6][6][6];
-      bA_bas = &dsm_t04[0][0][0][0];
-    }
-  else if (!strcmp (matname, "t99"))
-    {
-      extern short dsm_t99[6][6][6][6];
-      bA_bas = &dsm_t99[0][0][0][0];
-    }
-  else if (!strcmp (matname, "su95"))
-    {
-      extern short dsm_su95_rev_wGU_pos[6][6][6][6];
-      bA_bas = &dsm_su95_rev_wGU_pos[0][0][0][0];
-    }
-  else if (!strcmp (matname, "slh04_noGU"))
-    {
-      extern short dsm_slh04_noGU_pos[6][6][6][6];
-      bA_bas = &dsm_slh04_noGU_pos[0][0][0][0];
-    }
-  else if (!strcmp (matname, "su95_noGU"))
-    {
-      extern short dsm_su95_rev_noGU_pos[6][6][6][6];
-      bA_bas = &dsm_su95_rev_noGU_pos[0][0][0][0];
-    }
-  else
-    {
-	    fprintf(stderr, "Undefined matrix (%s), -m needs to be set to either t99 or t04 for RNA-RNA interaction, su95 or su95_noGU for RNA-DNA interaction or slh04_noGU for DNA interaction\n", matname);
-      exit (1);
-    }
-  bA_ext = &dsm_extend[0][0][0][0];
-
-  /* create dsm from   dsm_base - d * dsm_extend   */
-  for (i = 0; i < 1296; i++)
-    {
-      *(bA_nu + i) = *(bA_bas + i) - extPen * *(bA_ext + i);	/* bA_nu[i] =  ... also works */
-    }
-  return 0;
+	if (!((seq1file_name || seq1_cli) && (seq2file_name || seq2_cli))) {
+		fprintf(stderr, "\nYou need to provide a query (see -Q or -q option) and a target (-T/-t)\n\n");
+		usage(argv[0]);
+	}
+	if (seq1file_name && (!strcmp(seq1file_name, "-"))) {
+		fprintf(stderr, "\nQuery can currently not be read from STDIN, only target can!\n\n");
+		usage(argv[0]);
+	}
 }
 
 int
@@ -768,8 +753,7 @@ max5f (float a, float b, float c, float d, float e)
 
 float
 find_max_value_f (float **M, float **Ix, float **Iy, int *k, int *i, int j,
-		  int n, short dsm[6][6][6][6], unsigned char *qseq,
-		  unsigned char *tseq)
+		  int n, dsm_t dsm, unsigned char *qseq, unsigned char *tseq)
 {
   float max = 0.0;
   *i = 0;			/*row in which maxval is found */
@@ -936,7 +920,7 @@ RIs (unsigned char *qseq,	/* query sequence - numeric representation */
      unsigned char *tseq,	/* target sequence - reversed */
      int m,			/* query seq length */
      int n,			/* target seq length */
-     short dsm[6][6][6][6],	/* scoring matrix */
+     dsm_t dsm,			/* scoring matrix */
      IA * hit			/* pointer to struct, fill results */
   )
 {
@@ -1263,6 +1247,13 @@ RIs (unsigned char *qseq,	/* query sequence - numeric representation */
 		   Ix[i - 1][j - 1] +
 		   dsm[qseq[i - 2]][qseq[i - 1]][GAP][tseq[j - 1]])
 	    {
+#ifdef DEBUG
+#if VERBOSE>1
+				printf("Not the case, so check if it's \n");
+				printf(" ==  M[i-1][j-1] (%d)\n", Ix[i - 1][j - 1]);
+				printf(" + dsm[qseq[i - 2]][qseq[i - 1]][GAP][tseq[j - 1]] (%d) \n", dsm[qseq[i - 2]][qseq[i - 1]][GAP][tseq[j - 1]]);
+#endif
+#endif
 /*      coming from gap in seq2/target */
 	      k = 1;
 	    }
@@ -1270,12 +1261,19 @@ RIs (unsigned char *qseq,	/* query sequence - numeric representation */
 		   Iy[i - 1][j - 1] +
 		   dsm[GAP][qseq[i - 1]][tseq[j - 2]][tseq[j - 1]])
 	    {
+#ifdef DEBUG
+#if VERBOSE>1
+				printf("Not the case, so check if it's \n");
+				printf(" ==  M[i-1][j-1] (%d)\n", Iy[i - 1][j - 1]);
+				printf(" + dsm[GAP][qseq[i - 1]][tseq[j - 2]][tseq[j - 1]] (%d) \n", dsm[GAP][qseq[i - 1]][tseq[j - 2]][tseq[j - 1]]);
+#endif
+#endif
 /*      coming from gap in seq1/query */
 	      k = 2;
 	    }
 	  else
 	    {
-	      printf ("unexpected value in k=0.\n");
+	      fprintf (stderr, "unexpected value in k=0.\n");
 	    }
 	  hit->ali_seq1[l] = index2nt (qseq[--i]);
 	  hit->ali_seq2[l] = index2nt (tseq[--j]);
@@ -1295,7 +1293,7 @@ RIs (unsigned char *qseq,	/* query sequence - numeric representation */
 	  l++;
 #ifdef DEBUG
 #if VERBOSE>1
-	  printf ("print pos %d / %d = %c/ %c\n", i, j, hit->ali_seq1[l - 1], hit->ali_seq2[l - 1]);
+	  printf ("print pos %d / %d = %c%c/ %c%c\n", i, j, hit->ali_seq1[l - 1], hit->ali_seq1[l + 1], hit->ali_seq2[l - 1], hit->ali_seq2[l + 1]);
 #endif
 #endif
 
@@ -1387,7 +1385,7 @@ RIs (unsigned char *qseq,	/* query sequence - numeric representation */
   printf("%s\n%s\n", ali_seq1, ali_seq2);
   printf("%lu - %lu (3' <-- 5')\n", n-j, n+1-maxj);  //n+1-(j+1)
 
-  printf("Score2fakeE (not considering extpen): %.2f\n", (maxval-559.0)/(-100.0));
+  printf("Score2fakeE (not considering extpen): %.2f\n", (maxval-dsm_offset)/(-SCALEFACTOR));
   printf("no of nucls in ia: %d + %d = %d\n", maxi-i , maxj-j, maxi-i + maxj-j);
 */
   freeIntMatrix (M, m + 1);
@@ -1401,15 +1399,15 @@ RIs_linSpace (unsigned char *qseq,	/* query sequence - numeric representation */
 	      unsigned char *tseq,	/* target sequence */
 	      int m,		/* query seq length */
 	      int n,		/* target seq length */
-	      short dsm[6][6][6][6],	/* scoring matrix -- TODO variable length!? */
+	      dsm_t dsm,	/* scoring matrix -- TODO variable length!? */
 	      int extensionpenalty,	/* as used in dsm, to calc Score2fakE -- now also a global */
 	      int threshold,	/* give out hits higher than that */
-	      char *qname,	/* query name */
-	      char *tname,	/* target name */
-	      char *matname	/* name of the scoring matrix */
+	      const char *qname,	/* query name */
+	      const char *tname,	/* target name */
+	      const char *matname	/* name of the scoring matrix */
   )
 {
-/* create a hit-struct instead and print from main or other sub?*/
+  /* create a hit-struct instead and print from main or other sub? */
   int **M, **Ix, **Iy;		/* matrices for alignment scores ending in different states */
   int maxi, maxj;
   int maxval, maxk, testmax;	/* maxk not needed!? - max will never be found in gapped anyway! */
@@ -1421,7 +1419,7 @@ RIs_linSpace (unsigned char *qseq,	/* query sequence - numeric representation */
   int tmpQbeg, tmpTend;
 
   unsigned char *tmpQseq, *tmpTseq;
-  short tmpQlen, tmpTlen;
+  int tmpQlen, tmpTlen;
   int nt_count;			/*number of nt in ia to recalc Score2fakE - only tmp no need to store... */
   int tmp, locMax, tmp_min_j;
 
@@ -1793,23 +1791,10 @@ RIs_linSpace (unsigned char *qseq,	/* query sequence - numeric representation */
 #endif
       nt_count =
 	maxHit->qend - maxHit->qbeg + 1 + maxHit->tend - maxHit->tbeg + 1;
-      if (!(strcmp (matname, "t99")) || !(strcmp (matname, "t04")))
-	{
-	  energy =
-	    (maxHit->max + extensionpenalty * nt_count - 559.0) / (-100.0);
-	}
-      else if (!(strcmp (matname, "su95"))
-	       || !(strcmp (matname, "su95_noGU")))
-	{
-	  energy =
-	    (maxHit->max + extensionpenalty * nt_count - 249.0) / (-100.0);
-	}
-      else
-	{
-	  energy =
-	    (maxHit->max + extensionpenalty * nt_count - 363.0) / (-100.0);
-	}
-    /** TODO :: use maxHit->max OR maxval==hits_score[maxj-1] in output !?!? **/
+      energy =
+	(maxHit->max + extensionpenalty * nt_count -
+	 dsm_offset) / (-SCALEFACTOR);
+	/** TODO :: use maxHit->max OR maxval==hits_score[maxj-1] in output !?!? **/
       if (energy <= maxEnergy)
 	{
 	  if (printShort == 1)
@@ -1936,32 +1921,16 @@ RIs_linSpace (unsigned char *qseq,	/* query sequence - numeric representation */
 
 	  nt_count =
 	    maxHit->qend - maxHit->qbeg + 1 + maxHit->tend - maxHit->tbeg + 1;
-	  if (!(strcmp (matname, "t99")) || !(strcmp (matname, "t04")))
-	    {
-	      energy =
-		(maxHit->max + extensionpenalty * nt_count -
-		 559.0) / (-100.0);
-	    }
-	  else if (!(strcmp (matname, "su95"))
-		   || !(strcmp (matname, "su95_noGU")))
-	    {
-	      energy =
-		(maxHit->max + extensionpenalty * nt_count -
-		 249.0) / (-100.0);
-	    }
-	  else
-	    {
-	      energy =
-		(maxHit->max + extensionpenalty * nt_count -
-		 363.0) / (-100.0);
-	    }
+	  energy =
+	    (maxHit->max + extensionpenalty * nt_count -
+	     dsm_offset) / (-SCALEFACTOR);
 
-/* TODO anything about this or ignore !?
-      if (maxHit->max != hits_score[j]) {
-        printf("did some realignment here - probably resulting in a duplicate...\n");
-      }
-*/
-/** TODO :: use maxHit->max OR hits_score[j] in output !?!? **/
+	  /* TODO anything about this or ignore !?
+	     if (maxHit->max != hits_score[j]) {
+	     printf("did some realignment here - probably resulting in a duplicate...\n");
+	     }
+	   */
+		/** TODO :: use maxHit->max OR hits_score[j] in output !?!? **/
 	  if (energy <= maxEnergy)
 	    {
 	      if (printShort == 1)
@@ -2035,8 +2004,8 @@ RIs_force_start_end_init (unsigned char *qseqIx,	/* query sequence - numeric rep
 			  unsigned char *tseqIx,	/* target sequence  */
 			  int len_seq1,	/* query seq length */
 			  int len_seq2,	/* target seq length */
-			  short dsm[6][6][6][6],	/* scoring matrix */
-			  char *matname	/* name of the scoring matrix */
+			  dsm_t dsm,	/* scoring matrix */
+			  const char *matname	/* name of the scoring matrix */
   )
 {
   int i;
@@ -2121,9 +2090,9 @@ RIs_force_start_end_weighted (unsigned char *qseq,	/* query sequence - numeric r
 			      int m,	/* query seq length */
 			      int n,	/* target seq length */
 			      float *weights,	/*array of weights */
-			      short dsm[6][6][6][6],	/* scoring matrix */
+			      dsm_t dsm,	/* scoring matrix */
 			      IA * hit,	/* pointer to struct, fill results */
-			      char *matname)
+			      const char *matname)
 {
 
   float **M, **Ix, **Iy;	/* matrices for alignment scores ending in different states */
@@ -2465,19 +2434,10 @@ RIs_force_start_end_weighted (unsigned char *qseq,	/* query sequence - numeric r
 	}
       printf ("%s\t%s\n", query_alignment, target_alignment);
 
-      if (!(strcmp (matname, "t99")) || !(strcmp (matname, "t04")))
-	{
-	  energy = (max_score - force_start_val - 559.0) / (-100.0);
-	}
-      else if (!(strcmp (matname, "su95"))
-	       || !(strcmp (matname, "su95_noGU")))
-	{
-	  energy = (max_score - force_start_val - 249.0) / (-100.0);
-	}
-      else
-	{
-	  energy = (max_score - force_start_val - 363.0) / (-100.0);
-	}
+      printf ("matname %s, max_score %f, force_start_val %d\n", matname,
+	      max_score, force_start_val);
+
+      energy = (max_score - force_start_val - dsm_offset) / (-SCALEFACTOR);
       printf ("Free energy [kcal/mol] (No extension penalty): %.2f (%f)\n",
 	      energy, max_score - force_start_val);
     }

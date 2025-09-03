@@ -1,0 +1,7 @@
+slh04_woGU.1.2.tsv    # DNA/DNA parameters for version 1.2
+su95_rev_wGU.1.2.tsv  # RNA/DNA parameters for version 1.2, GU wobbles
+su95_rev_woGU.1.2.tsv # RNA/DNA parameters for version 1.2, no GU wobbles
+t04.1.2.tsv           # RNA/RNA parameters for version 1.2
+t99.1.2.tsv           # RNA/RNA parameters for version 1.2
+su95c2_wGU.1.3.tsv    # RNA/RNA parameters for version 1.3, developed by G. Corsi for CRISPROff2
+su95wk11_wGU.1.3.tsv  # RNA/RNA parameters for version 1.3, developed by G. Corsi for CRISPROff2

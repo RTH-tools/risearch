@@ -23,23 +23,32 @@
 #define __DSM_H__
 
 #include <stdint.h>
-
-/* dsm gap value */
-#define GAP   0
+#if RISVERSION == 2
+ /* position of '-' in alphabet, as used in code, not as defined if read from matrix... */
+#define GAP 0
+#define MATVERSION 2
+#elif RISVERSION == 1
+/* position of '-' in alphabet, not as define if read from matrix... */
+#define GAP 5
+#define MATVERSION 1
+#endif
 
 /* dsm size */
 #define DSM_N 6
+#define DSM_DIM 6*6*6*6
+#define DSM_N_F 1
+#define SCALEFACTOR 10000.0
+
+#define TEMPERATURE1 310.15
+#define TEMPERATURE2 273.15
 
 /* dsm type */
 typedef int dsm_t[DSM_N][DSM_N][DSM_N][DSM_N];
+typedef float dsmf_t[DSM_N][DSM_N][DSM_N][DSM_N];
 
-/* dsm RNA-RNA energy tables */
-extern const dsm_t dsm_t99_pos;
-extern const dsm_t dsm_t99_neg;
-extern const dsm_t dsm_t04_pos;
-extern const dsm_t dsm_t04_neg;
-extern const dsm_t dsm_extend_pos;
-extern const dsm_t dsm_extend_neg;
-
-
+extern int dsm_offset;
+extern dsm_t dsm_T;
+extern dsm_t dsm_extend;
+extern void getMat(const char *matname, const char *matname2, const char *matpath, float *T, int *bA_nu);
+extern int extPen;
 #endif

@@ -21,6 +21,7 @@
 *********************************************************************/
 #ifndef __MAIN_H__
 #define __MAIN_H__ 1
+#include "../../config.h"
 
 #include "dsm.h"
 #include "sa.h"
@@ -83,11 +84,16 @@ extern char **name;
 extern double min_energy;
 extern const dsm_t *S;
 extern int seed_flag, seed_orig[3], max_ext_len;
+extern int bulge_flag, max_size_bulge, max_nt_bulge, max_n_bulge;
 extern double min_seed_energy_per_length;
 extern int seed_mismatch[3], seed_mismatch_flag, seed_threshold_flag;
 //extern char* strdup(const char*);
 extern int verbose;
 extern int noGUseed;
+extern float *weights;
+extern int bands;
+extern int bands_flag;
+extern const char *matrix;
 
 extern void debug(const char *msg, ...);
 extern void str_rev(char *s);

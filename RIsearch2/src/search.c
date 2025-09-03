@@ -31,6 +31,7 @@
 #include "main.h"
 #include "sa.h"
 #include "lists.h"
+#include "dsm.h"
 
 #define min(a,b) \
     ({ __typeof__ (a) _a = (a); \
@@ -71,6 +72,12 @@ max3 (int a, int b, int c)
 {
   int tmp = (a > b) ? a : b;
   return (c > tmp) ? c : tmp;
+}
+
+float max3f(float a, float b, float c)
+{
+	float tmp = (a > b) ? a : b;
+	return (c > tmp) ? c : tmp;
 }
 
 int
@@ -227,7 +234,9 @@ DP_left (int *M,		//!<[out] DP matrix for match state
 #define TI(q,t) ((q)*(lt) + (t))
 
   int i, j;
+  int js, je;
   int best_e;
+  int bt, bq;
 
   if (print_debug)
     fprintf (stderr, "dp_left, q_start: %lu t_start: %lu lq: %d lt: %d\n",
@@ -240,6 +249,38 @@ DP_left (int *M,		//!<[out] DP matrix for match state
   if (lq <= 1 || lt <= 1)
     return best_e;
 
+  // Setup bands for restricted search
+  if (bands_flag) {
+    bt = min(bands, lt);
+    bq = min(bands, lq);
+    // init matrix NA
+		for (i = 0; i < lq; ++i) {
+			if (i <= bq + 1) {
+				M[TI (i, 0)] = NA;
+				Bt[TI (i, 0)] = NA;
+				Bt[TI (i, 1)] = NA;
+			}
+			if (i <= bt + 1) {
+				M[TI (0, i)] = NA;
+				Bq[TI (0, i)] = NA;
+				Bq[TI (1, i)] = NA;
+			}
+			js = i - bq - 1;
+			je = i + bt + 1;
+			if (js >= 0) {
+				M[TI (i, js)] = NA;
+				Bq[TI (i, js)] = NA;
+				Bt[TI (i, js + 1)] = NA;
+			}
+			if (je < lt) {
+				M[TI (i, je)] = NA;
+				Bq[TI (i + 1, je)] = NA;
+				Bt[TI (i, je)] = NA;
+			}
+		}
+	} else {
+  bt = lt;
+  bq = lq;
   Bq[TI (0, 0)] = NA;
   Bt[TI (0, 0)] = NA;
   M[TI (0, 1)] = NA;
@@ -248,6 +289,17 @@ DP_left (int *M,		//!<[out] DP matrix for match state
   Bt[TI (1, 0)] = NA;
   Bq[TI (1, 1)] = NA;
   Bt[TI (1, 1)] = NA;
+for (j = 2; j < lt; ++j) {
+	M[TI (0, j)] = NA;
+	Bq[TI (0, j)] = NA;
+	Bq[TI (1, j)] = NA;
+}
+for (i = 2; i < lq; ++i) {
+	M[TI (i, 0)] = NA;
+	Bt[TI (i, 0)] = NA;
+	Bt[TI (i, 1)] = NA;
+}
+}
 
   Bt[TI (0, 1)] = (*S)[GAP][Q (0)][T (1)][T (0)];
   Bq[TI (1, 0)] = (*S)[Q (1)][Q (0)][GAP][T (0)];
@@ -260,18 +312,14 @@ DP_left (int *M,		//!<[out] DP matrix for match state
     }
 
   //1. row (i=0), only Bt (gap in query) possible
-  for (j = 2; j < lt; ++j)
-    {
-      M[TI (0, j)] = NA;
-      Bq[TI (0, j)] = NA;
-      Bq[TI (1, j)] = NA;
-      //fprintf(stderr, "t_start - j: %d\n", t_start - j);
-      //fprintf(stderr, "TI(j,0): %d\n", TI(j,0));
-
+  for (j = 2; j < min(lt, bt + 1); ++j) {
       // gap here can only be extension from 0,1
       Bt[TI (0, j)] = Bt[TI (0, j - 1)] + (*S)[GAP][GAP][T (j)][T (j - 1)];
       // match can only be bulge closure from Bt, Bq and M are NA for i=0,j=2+
       M[TI (1, j)] = Bt[TI (0, j - 1)] + (*S)[Q (1)][GAP][T (j)][T (j - 1)];
+      if (j == bt) {
+            M[TI (1, j + 1)] = Bt[TI (0, j)] + (*S)[Q (1)][GAP][T (j + 1)][T (j)];
+      }
       if (M[TI (1, j)] + (*S)[GAP][Q (1)][GAP][T (j)] > best_e)
 	{
 	  best_e = M[TI (1, j)] + (*S)[GAP][Q (1)][GAP][T (j)];
@@ -281,13 +329,13 @@ DP_left (int *M,		//!<[out] DP matrix for match state
     }
 
   //1. col (j=0), only Bq (gap in target) possible
-  for (i = 2; i < lq; ++i)
+  for (i = 2; i < min(lq, bq + 1); ++i)
     {
-      M[TI (i, 0)] = NA;
-      Bt[TI (i, 0)] = NA;
-      Bt[TI (i, 1)] = NA;
       Bq[TI (i, 0)] = Bq[TI (i - 1, 0)] + (*S)[Q (i)][Q (i - 1)][GAP][GAP];
       M[TI (i, 1)] = Bq[TI (i - 1, 0)] + (*S)[Q (i)][Q (i - 1)][T (1)][GAP];
+      if (i == bq) {
+			M[TI (i + 1, 1)] = Bq[TI (i, 0)] + (*S)[Q (i + 1)][Q (i)][T (1)][GAP];
+		}
       if (M[TI (i, 1)] + (*S)[GAP][Q (i)][GAP][T (1)] > best_e)
 	{
 	  best_e = M[TI (i, 1)] + (*S)[GAP][Q (i)][GAP][T (1)];
@@ -299,6 +347,12 @@ DP_left (int *M,		//!<[out] DP matrix for match state
   if (lq <= 2 || lt <= 2)
     return best_e;
 
+	if (bq == 1) {
+		M[TI (2, 1)] = Bq[TI (1, 0)] + (*S)[Q(2)][Q(1)][T (1)][GAP];
+	}
+	if (bt == 1) {
+		M[TI (1, 2)] = Bt[TI (0, 1)] + (*S)[Q(1)][GAP][T (2)][T (1)];
+	}
   Bt[TI (1, 2)] = M[TI (1, 1)] + (*S)[GAP][Q (1)][T (2)][T (1)];
   Bq[TI (2, 1)] = M[TI (1, 1)] + (*S)[Q (2)][Q (1)][GAP][T (1)];
   M[TI (2, 2)] = M[TI (1, 1)] + (*S)[Q (2)][Q (1)][T (2)][T (1)];
@@ -312,7 +366,7 @@ DP_left (int *M,		//!<[out] DP matrix for match state
   Bt[TI (2, 2)] = M[TI (2, 1)] + (*S)[GAP][Q (2)][T (2)][T (1)];
 
   //initialize limited rows
-  for (j = 3; j < lt; ++j)
+  for (j = 3; j < min(lt, bt + 2); ++j)
     {
       //i=1: M already set; Bq is NA; Bt as in main recursion
       Bt[TI (1, j)] =
@@ -328,6 +382,10 @@ DP_left (int *M,		//!<[out] DP matrix for match state
       Bt[TI (2, j)] =
 	max (M[TI (2, j - 1)] + (*S)[GAP][Q (2)][T (j)][T (j - 1)],
 	     Bt[TI (2, j - 1)] + (*S)[GAP][GAP][T (j)][T (j - 1)]);
+      if ((j == bt + 1) && (j < lt - 1)) {
+        Bt[TI (2, j + 1)] = max(M[TI (2, j)] + (*S)[GAP][Q (2)][T (j + 1)][T (j)], Bt[TI (2, j)] + (*S)[GAP][GAP][T (j + 1)][T (j)]);
+        M[TI (2, j + 1)] = max(M[TI (1, j)] + (*S)[Q (2)][Q (1)][T (j + 1)][T (j)], Bt[TI (1, j)] + (*S)[Q (2)][GAP][T (j + 1)][T (j)]);
+      }
       if (M[TI (2, j)] + (*S)[GAP][Q (2)][GAP][T (j)] > best_e)
 	{
 	  best_e = M[TI (2, j)] + (*S)[GAP][Q (2)][GAP][T (j)];
@@ -337,7 +395,7 @@ DP_left (int *M,		//!<[out] DP matrix for match state
     }
 
   //initialize limited columns
-  for (i = 3; i < lq; ++i)
+  for (i = 3; i < min(lq, bq + 2); ++i)
     {
       //i=1: M already set; Bt is NA; Bq as in main recursion
       Bq[TI (i, 1)] =
@@ -353,6 +411,11 @@ DP_left (int *M,		//!<[out] DP matrix for match state
       Bq[TI (i, 2)] =
 	max (M[TI (i - 1, 2)] + (*S)[Q (i)][Q (i - 1)][GAP][T (2)],
 	     Bq[TI (i - 1, 2)] + (*S)[Q (i)][Q (i - 1)][GAP][GAP]);
+      if ((i == bq + 1) && (i < lq - 1))
+	{
+	Bq[TI (i + 1, 2)] = max(M[TI (i, 2)] + (*S)[Q (i + 1)][Q (i)][GAP][T (2)], Bq[TI (i, 2)] + (*S)[Q (i + 1)][Q (i)][GAP][GAP]);
+	M[TI (i + 1, 2)] = max(M[TI (i, 1)] + (*S)[Q (i + 1)][Q (i)][T (2)][T (1)], Bq[TI (i, 1)] + (*S)[Q (i + 1)][Q (i)][T (2)][GAP]);
+}
       if (M[TI (i, 2)] + (*S)[GAP][Q (i)][GAP][T (2)] > best_e)
 	{
 	  best_e = M[TI (i, 2)] + (*S)[GAP][Q (i)][GAP][T (2)];
@@ -361,23 +424,34 @@ DP_left (int *M,		//!<[out] DP matrix for match state
 	}
     }
 
+	if (bt == 1) {
+		Bt[TI (2, 3)] = max(M[TI (2, 2)] + (*S)[GAP][Q (2)][T (3)][T (2)], Bt[TI (2, 2)] + (*S)[GAP][GAP][T (3)][T (2)]);
+		M[TI (2, 3)] = max(M[TI (1, 2)] + (*S)[Q (2)][Q (1)][T (3)][T (2)], Bt[TI (1, 2)] + (*S)[Q (2)][GAP][T (3)][T (2)]);
+	}
+	if (bq == 1) {
+		Bq[TI (3, 2)] = max(M[TI (2, 2)] + (*S)[Q (3)][Q (2)][GAP][T (2)], Bq[TI (2, 2)] + (*S)[Q (3)][Q (2)][GAP][GAP]);
+		M[TI (3, 2)] = max(M[TI (2, 1)] + (*S)[Q (3)][Q (2)][T (2)][T (1)], Bq[TI (2, 1)] + (*S)[Q (3)][Q (2)][T (2)][GAP]);
+	}
+
   for (i = 3; i < lq; ++i)
+  {
+    for (j = max(3, i - bq); j < min(lt, i + bt + 1); ++j)
     {
-      for (j = 3; j < lt; ++j)
-	{
-	  M[TI (i, j)] =
+      M[TI (i, j)] =
 	    max3 (M[TI (i - 1, j - 1)] +
 		  (*S)[Q (i)][Q (i - 1)][T (j)][T (j - 1)],
 		  Bq[TI (i - 1, j - 1)] + (*S)[Q (i)][Q (i - 1)][T (j)][GAP],
 		  Bt[TI (i - 1, j - 1)] + (*S)[Q (i)][GAP][T (j)][T (j - 1)]);
-
+      if ((j - i) < bt) {
 	  Bq[TI (i, j)] =
 	    max (M[TI (i - 1, j)] + (*S)[Q (i)][Q (i - 1)][GAP][T (j)],
 		 Bq[TI (i - 1, j)] + (*S)[Q (i)][Q (i - 1)][GAP][GAP]);
+      }
+      if ((i - j) < bq) {
 	  Bt[TI (i, j)] =
 	    max (M[TI (i, j - 1)] + (*S)[GAP][Q (i)][T (j)][T (j - 1)],
 		 Bt[TI (i, j - 1)] + (*S)[GAP][GAP][T (j)][T (j - 1)]);
-
+      }
 	  if (M[TI (i, j)] + (*S)[GAP][Q (i)][GAP][T (j)] > best_e)
 	    {
 	      best_e = M[TI (i, j)] + (*S)[GAP][Q (i)][GAP][T (j)];
@@ -517,6 +591,390 @@ DP_left (int *M,		//!<[out] DP matrix for match state
   return best_e;
 }
 
+int DP_left_weighted(float *M,		//!<[out] DP matrix for match state
+	    float *Bq,		//!<[out] DP matrix for query bulged state
+	    float *Bt,		//!<[out] DP matrix for target bulged state
+	    int lq,		//!<[in] Length of remaining query (height of DP matrices)
+	    int lt,		//!<[in] Length of remaining target (width of DP matrices)
+	    int lfq, //!<[in] full length of query
+	    float *weights, //! Array of weights
+	    const saidx64_t * qsa,	//!<[in] Suffix array of the query
+	    const saidx64_t * tsa,	//!<[in] Suffix array of the target
+	    saidx64_t q_start,	//!<[in] Start within query sequence (first pos of seed)
+	    saidx64_t t_start,	//!<[in] Start within target sequence (first pos of seed)
+	    saidx64_t * best_i,	//!<[out] best query pos (as distance from q_start)
+	    saidx64_t * best_j)	//!<[out] best target pos (as distance from t_start)
+{
+
+// macros to get the sequence letter at an offset from q_start or t_start
+#define Q(ix) (XRIS(qsa[q_start-(ix)]))
+#define W(ix) (lfq - lq + (ix))
+#define T(ix) (comp[XRIS(tsa[t_start-(ix)])])
+
+#define TI(q,t) ((q)*(lt) + (t))
+
+	int i, j, js, je;
+	int best_e;
+    int bt, bq;
+
+    // Setup bands for restricted search
+	if (bands_flag){
+	    bt = min(bands , lt);
+	    bq = min(bands, lq);
+	    // init matrix NA
+        for (i = 0; i < lq; ++i)
+	{
+            if (i <= bq +1){
+                M[TI (i, 0)] = NA;
+                Bt[TI (i, 0)] = NA;
+                Bt[TI (i, 1)] = NA;
+            }
+            if (i <= bt +1){
+                M[TI (0, i)] = NA;
+                Bq[TI (0, i)] = NA;
+                Bq[TI (1, i)] = NA;
+            }
+            js = i - bq - 1;
+            je = i + bt + 1;
+            if (js >= 0){
+                M[TI (i, js)] = NA;
+                Bq[TI (i, js)] = NA;
+                Bt[TI (i, js + 1)] = NA;
+            }
+            if (je < lt){
+                M[TI (i, je)] = NA;
+                Bq[TI (i+1, je)] = NA;
+                Bt[TI (i, je)] = NA;
+            }
+        }
+	}
+	else
+	{
+        bt = lt;
+        bq = lq;
+        Bq[TI (0, 0)] = NA;
+        Bt[TI (0, 0)] = NA;
+        M[TI (0, 1)] = NA;
+        Bq[TI (0, 1)] = NA;
+        M[TI (1, 0)] = NA;
+        Bt[TI (1, 0)] = NA;
+        Bq[TI (1, 1)] = NA;
+        Bt[TI (1, 1)] = NA;
+        for (j = 2; j < lt; ++j)
+	{
+            M[TI (0, j)] = NA;
+            Bq[TI (0, j)] = NA;
+            Bq[TI (1, j)] = NA;
+        }
+        for (i = 2; i < lq; ++i)
+	{
+            M[TI (i, 0)] = NA;
+            Bt[TI (i, 0)] = NA;
+            Bt[TI (i, 1)] = NA;
+        }
+	}
+
+	M[TI (0, 0)] = 0;
+	best_e = (*S)[GAP][Q(0)][GAP][T(0)];
+	*best_i = 0;
+	*best_j = 0;
+	if (lq <= 1 || lt <= 1)
+		return best_e;
+
+    Bt[TI (0, 1)] = (*S)[GAP][Q(0)][T(1)][T(0)] * ((weights[W(-1)] + weights[W(0)])/2);
+    Bq[TI (1, 0)] = (*S)[Q(1)][Q(0)][GAP][T(0)] * weights[W(0)];
+    M[TI (1, 1)] = (*S)[Q(1)][Q(0)][T(1)][T(0)] * weights[W(0)];
+
+	if (M[TI (1, 1)] + (*S)[GAP][Q(1)][GAP][T(1)] > best_e) {
+		best_e = M[TI (1, 1)] + (*S)[GAP][Q(1)][GAP][T(1)];
+		*best_i = 1;
+		*best_j = 1;
+	}
+
+	// Setup bands for restricted search
+	if (bands_flag){
+	    bt = min(bands, lt);
+	    bq = min(bands, lq);
+	}
+	else {
+	    bt = lt;
+	    bq = lq;
+	}
+
+	//1. row (i=0), only Bt (gap in query) possible
+	for (j = 2; j < min(lt, bt + 1); ++j)
+	{
+        // gap here can only be extension from 0,1
+        Bt[TI (0, j)] = Bt[TI (0, j - 1)] + (*S)[GAP][GAP][T(j)][T(j - 1)] * ((weights[W(-1)] + weights[W(0)])/2);
+        // match can only be bulge closure from Bt, Bq and M are NA for i=0,j=2+
+        M[TI (1, j)] = Bt[TI (0, j - 1)] + (*S)[Q(1)][GAP][T(j)][T(j - 1)] * weights[W(0)];
+        if (j == bt){
+		    M[TI (1, j + 1)] = Bt[TI (0, j)] + (*S)[Q(1)][GAP][T(j + 1)][T(j)] * weights[W(0)];
+		}
+		if (M[TI (1, j)] + (*S)[GAP][Q(1)][GAP][T(j)] > best_e) {
+			best_e = M[TI (1, j)] + (*S)[GAP][Q(1)][GAP][T(j)];
+			*best_i = 1;
+			*best_j = j;
+		}
+	}
+
+	//1. col (j=0), only Bq (gap in target) possible
+	for (i = 2; i < min(lq, bq + 1); ++i)
+	{
+        Bq[TI (i, 0)] = Bq[TI (i - 1, 0)] + (*S)[Q(i)][Q(i - 1)][GAP][GAP] * weights[W(i-1)];
+        M[TI (i, 1)] = Bq[TI (i - 1, 0)] + (*S)[Q(i)][Q(i - 1)][T(1)][GAP] * weights[W(i-1)];
+	    if (i == bq){
+		    M[TI (i + 1, 1)] = Bq[TI (i, 0)] + (*S)[Q(i + 1)][Q(i)][T(1)][GAP] * weights[W(i)];
+		}
+
+		if (M[TI (i, 1)] + (*S)[GAP][Q(i)][GAP][T(1)] > best_e) {
+			best_e = M[TI (i, 1)] + (*S)[GAP][Q(i)][GAP][T(1)];
+			*best_i = i;
+			*best_j = 1;
+		}
+	}
+
+	if (lq <= 2 || lt <= 2)
+		return best_e;
+
+    if (bq == 1){
+        M[TI (2, 1)] = Bq[TI (1, 0)] + (*S)[Q(2)][Q(1)][T(1)][GAP] * weights[W(1)];
+    }
+    if (bt == 1){
+        M[TI (1, 2)] = Bt[TI (0, 1)] + (*S)[Q(1)][GAP][T(2)][T(1)] * weights[W(0)];
+    }
+    Bt[TI (1, 2)] = M[TI (1, 1)] + (*S)[GAP][Q(1)][T(2)][T(1)] * ((weights[W(0)] + weights[W(1)])/2);
+    Bq[TI (2, 1)] = M[TI (1, 1)] + (*S)[Q(2)][Q(1)][GAP][T(1)] * weights[W(1)];
+    M[TI (2, 2)] = M[TI (1, 1)] + (*S)[Q(2)][Q(1)][T(2)][T(1)] * weights[W(1)];
+
+	if (M[TI (2, 2)] + (*S)[GAP][Q(2)][GAP][T(2)] > best_e) {
+		best_e = M[TI (2, 2)] + (*S)[GAP][Q(2)][GAP][T(2)];
+		*best_i = 2;
+		*best_j = 2;
+	}
+
+    Bq[TI (2, 2)] = M[TI (1, 2)] + (*S)[Q(2)][Q(1)][GAP][T(2)] * weights[W(1)];
+    Bt[TI (2, 2)] = M[TI (2, 1)] + (*S)[GAP][Q(2)][T(2)][T(1)] * ((weights[W(1)] + weights[W(2)])/2);
+
+	//initialize limited rows
+	for (j = 3; j < min(lt , bt + 2); ++j)
+	{
+		//i=1: M already set; Bq is NA; Bt as in main recursion
+		// 3rd row (i=2)
+		// Bq is not a possible source for M and Bq
+
+        Bt[TI (1, j)] = max(M[TI (1, j - 1)] + (*S)[GAP][Q(1)][T(j)][T(j - 1)] * ((weights[W(0)] + weights[W(1)])/2),
+                           Bt[TI (1, j - 1)] + (*S)[GAP][GAP][T(j)][T(j - 1)] * ((weights[W(0)] + weights[W(1)])/2));
+        M[TI (2, j)] = max(M[TI (1, j - 1)] + (*S)[Q(2)][Q(1)][T(j)][T(j - 1)] * weights[W(1)],
+                          Bt[TI (1, j - 1)] + (*S)[Q(2)][GAP][T(j)][T(j - 1)] * weights[W(1)]);
+        Bq[TI (2, j)] = M[TI (1, j)] + (*S)[Q(2)][Q(1)][GAP][T(j)] * weights[W(1)];
+		//Bt as in main recursion
+		Bt[TI (2, j)] = max(M[TI (2, j - 1)] + (*S)[GAP][Q(2)][T(j)][T(j - 1)] * ((weights[W(1)] + weights[W(2)])/2),
+                           Bt[TI (2, j - 1)] + (*S)[GAP][GAP][T(j)][T(j - 1)] * ((weights[W(1)] + weights[W(2)])/2));
+		if ((j == bt + 1) && (j < lt - 1)){
+		    Bt[TI (2, j + 1)] = max(M[TI (2, j)] + (*S)[GAP][Q(2)][T(j + 1)][T(j)] * ((weights[W(1)] + weights[W(2)])/2),
+		                           Bt[TI (2, j)] + (*S)[GAP][GAP][T(j + 1)][T(j)] * ((weights[W(1)] + weights[W(2)])/2));
+		    M[TI (2, j + 1)] = max(M[TI (1, j)] + (*S)[Q(2)][Q(1)][T(j + 1)][T(j)] * weights[W(1)],
+		                          Bt[TI (1, j)] + (*S)[Q(2)][GAP][T(j + 1)][T(j)] * weights[W(1)]);
+		}
+		if (M[TI (2, j)] + (*S)[GAP][Q(2)][GAP][T(j)] > best_e) {
+			best_e = M[TI (2, j)] + (*S)[GAP][Q(2)][GAP][T(j)];
+			*best_i = 2;
+			*best_j = j;
+		}
+	}
+
+	//initialize limited columns
+	for (i = 3; i < min(lq, bq + 2); ++i)
+	{
+		//i=1: M already set; Bt is NA; Bq as in main recursion
+
+        Bq[TI (i, 1)] = max(M[TI (i - 1, 1)] + (*S)[Q(i)][Q(i - 1)][GAP][T(1)] * weights[W(i - 1)],
+                           Bq[TI (i - 1, 1)] + (*S)[Q(i)][Q(i - 1)][GAP][GAP] * weights[W(i - 1)]);
+        // 3rd col (j=2)
+        // Bt is nor a possible source for M and Bt
+        M[TI (i, 2)] = max(M[TI (i - 1, 1)] + (*S)[Q(i)][Q(i - 1)][T(2)][T(1)] * weights[W(i - 1)],
+                          Bq[TI (i - 1, 1)] + (*S)[Q(i)][Q(i - 1)][T(2)][GAP] * weights[W(i - 1)]);
+        Bt[TI (i, 2)] = M[TI (i, 1)] + (*S)[GAP][Q(i)][T(2)][T(1)] * ((weights[W(i - 1)] + weights[W(i)])/2);
+
+        Bq[TI (i, 2)] = max(M[TI (i - 1, 2)] + (*S)[Q(i)][Q(i - 1)][GAP][T(2)] * weights[W(i - 1)],
+                           Bq[TI (i - 1, 2)] + (*S)[Q(i)][Q(i - 1)][GAP][GAP] * weights[W(i - 1)]);
+		if ((i == bq + 1) && (i < lq - 1)){
+            Bq[TI (i + 1, 2)] = max(M[TI (i, 2)] + (*S)[Q(i + 1)][Q(i)][GAP][T(2)] * weights[W(i)],
+                                   Bq[TI (i, 2)] + (*S)[Q(i + 1)][Q(i)][GAP][GAP] * weights[W(i)]);
+		    M[TI (i + 1, 2)] = max(M[TI (i, 1)] + (*S)[Q(i + 1)][Q(i)][T(2)][T(1)] * weights[W(i)],
+                                  Bq[TI (i, 1)] + (*S)[Q(i + 1)][Q(i)][T(2)][GAP] * weights[W(i)]);
+		}
+
+
+		if (M[TI (i, 2)] + (*S)[GAP][Q(i)][GAP][T(2)] > best_e) {
+			best_e = M[TI (i, 2)] + (*S)[GAP][Q(i)][GAP][T(2)];
+			*best_i = i;
+			*best_j = 2;
+		}
+	}
+
+    if (bt == 1) {
+        Bt[TI (2, 3)] = max(M[TI (2, 2)] + (*S)[GAP][Q(2)][T(3)][T(2)] * ((weights[W(1)] + weights[W(2)])/2),
+                           Bt[TI (2, 2)] + (*S)[GAP][GAP][T(3)][T(2)] * ((weights[W(1)] + weights[W(2)])/2));
+        M[TI (2, 3)] = max(M[TI (1, 2)] + (*S)[Q(2)][Q(1)][T(3)][T(2)] * weights[W(1)],
+                          Bt[TI (1, 2)] + (*S)[Q(2)][GAP][T(3)][T(2)] * weights[W(1)]);
+    }
+    if (bq == 1){
+        Bq[TI (3, 2)] = max(M[TI (2, 2)] + (*S)[Q(3)][Q(2)][GAP][T(2)] * weights[W(2)],
+                           Bq[TI (2, 2)] + (*S)[Q(3)][Q(2)][GAP][GAP] * weights[W(2)]);
+        M[TI (3, 2)] = max(M[TI (2, 1)] + (*S)[Q(3)][Q(2)][T(2)][T(1)] * weights[W(2)],
+                          Bq[TI (2, 1)] + (*S)[Q(3)][Q(2)][T(2)][GAP] * weights[W(2)]);
+    }
+
+	for (i = 3; i < lq; ++i)
+	{
+		for (j = max(3, i - bq); j < min(lt, i + bt + 1); ++j)
+		{
+            M[TI (i, j)] = max3f(M[TI (i - 1, j - 1)] + (*S)[Q(i)][Q(i - 1)][T(j)][T(j - 1)] * weights[W(i - 1)],
+                               Bq[TI (i - 1, j - 1)] + (*S)[Q(i)][Q(i - 1)][T(j)][GAP] * weights[W(i - 1)],
+                               Bt[TI (i - 1, j - 1)] + (*S)[Q(i)][GAP][T(j)][T(j - 1)] * weights[W(i - 1)]);
+            if ((j - i) < bt){
+                Bq[TI (i, j)] = max(M[TI (i - 1, j)] + (*S)[Q(i)][Q(i - 1)][GAP][T(j)] * weights[W(i - 1)],
+                                   Bq[TI (i - 1, j)] + (*S)[Q(i)][Q(i - 1)][GAP][GAP] * weights[W(i - 1)]);
+            }
+            if ((i - j) < bq){
+                Bt[TI (i, j)] = max(M[TI (i, j - 1)] + (*S)[GAP][Q(i)][T(j)][T(j - 1)] * ((weights[W(i - 1)] + weights[W(i)])/2),
+                                   Bt[TI (i, j - 1)] + (*S)[GAP][GAP][T(j)][T(j - 1)] * ((weights[W(i - 1)] + weights[W(i)])/2));
+            }
+			if (M[TI (i, j)] + (*S)[GAP][Q(i)][GAP][T(j)] > best_e) {
+				best_e = M[TI (i, j)] + (*S)[GAP][Q(i)][GAP][T(j)];
+				*best_i = i;
+				*best_j = j;
+			}
+		}
+	}
+#undef Q
+#undef T
+#undef W
+
+	if (print_mats_l) {
+#define QS(ix) (XSTR(qsa[q_start-(ix)]))
+#define TS(ix) (XSTR(tsa[t_start-(ix)]))
+#define TSc(ix) (scomp[TS(ix)])
+		fprintf(stderr, "\n#### DP left ###\n");
+		fprintf(stderr, "=== M mat ===\n");
+		fprintf(stderr, "%4c%c ", 'x', 'x');
+		fprintf(stderr, "%4c%c ", '-', '-');
+		for (j = 1; j < lt; ++j)
+			fprintf(stderr, "%4c%c ", TSc (j), TSc (j - 1));
+		fprintf(stderr, "\n");
+		fprintf(stderr, "%4c%c ", '-', '-');
+		for (j = 0; j < lt; ++j)
+	       	{
+			if (M[TI (0, j)] == NA) {
+				fprintf(stderr, " -NA- ");
+			}
+else
+{
+				fprintf(stderr, "%f ", M[TI (0, j)]);
+			}
+		}
+		fprintf(stderr, "\n");
+		for (i = 1; i < lq; ++i)
+	       	{
+			fprintf(stderr, "%4c%c ", QS(i), QS(i - 1));
+			for (j = 0; j < lt; ++j)
+		       	{
+				if (M[TI (i, j)] == NA) {
+					fprintf(stderr, " -NA- ");
+				}
+else
+{
+					fprintf(stderr, "%f ", M[TI (i, j)]);
+				}
+			}
+			fprintf(stderr, "\n");
+		}
+
+		fprintf(stderr, "=== Bq mat ===\n");
+		fprintf(stderr, "%4c%c ", 'x', 'x');
+		fprintf(stderr, "%4c%c ", '-', '-');
+		for (j = 1; j < lt; ++j)
+			fprintf(stderr, "%4c%c ", TSc (j), TSc (j - 1));
+		fprintf(stderr, "\n");
+		fprintf(stderr, "%4c%c ", '-', '-');
+		for (j = 0; j < lt; ++j)
+	       	{
+			if (Bq[TI (0, j)] == NA) {
+				fprintf(stderr, " -NA- ");
+			}
+else
+{
+				fprintf(stderr, "%f ", Bq[TI (0, j)]);
+			}
+		}
+		fprintf(stderr, "\n");
+		for (i = 1; i < lq; ++i)
+	       	{
+			fprintf(stderr, "%4c%c ", QS(i), QS(i - 1));
+			for (j = 0; j < lt; ++j)
+		       	{
+				if (Bq[TI (i, j)] == NA)
+			       	{
+					fprintf(stderr, " -NA- ");
+				}
+else
+{
+					fprintf(stderr, "%f ", Bq[TI (i, j)]);
+				}
+			}
+			fprintf(stderr, "\n");
+		}
+
+		fprintf(stderr, "=== Bt mat ===\n");
+		fprintf(stderr, "%4c%c ", 'x', 'x');
+		fprintf(stderr, "%4c%c ", '-', '-');
+		for (j = 1; j < lt; ++j)
+			fprintf(stderr, "%4c%c ", TSc (j), TSc (j - 1));
+		fprintf(stderr, "\n");
+		fprintf(stderr, "%4c%c ", '-', '-');
+		for (j = 0; j < lt; ++j)
+	       	{
+			if (Bt[TI (0, j)] == NA) {
+				fprintf(stderr, " -NA- ");
+			}
+else
+{
+				fprintf(stderr, "%f ", Bt[TI (0, j)]);
+			}
+		}
+		fprintf(stderr, "\n");
+		for (i = 1; i < lq; ++i)
+	       	{
+			fprintf(stderr, "%4c%c ", QS(i), QS(i - 1));
+			for (j = 0; j < lt; ++j)
+		       	{
+				if (Bt[TI (i, j)] == NA) {
+					fprintf(stderr, " -NA- ");
+				}
+else
+{
+					fprintf(stderr, "%f ", Bt[TI (i, j)]);
+		}
+	    }
+	  fprintf (stderr, "\n");
+	}
+#undef QS
+#undef TS
+#undef TSc
+    }
+
+  if (print_debug)
+    {
+      fprintf (stderr, "best_e: %d at ", best_e);
+      fprintf (stderr, "best_i: %li, best_j: %li\n", *best_i, *best_j);
+    }
+
+#undef TI
+  return best_e;
+}
+
 
 
 /**
@@ -546,19 +1004,46 @@ DP_right (int *M,		//!<[out] DP matrix for match state
 #define TI(q,t) ((q)*(lt) + (t))
 
   int i, j;
+  int js, je;
   int best_e;
 
-  if (print_debug)
-    fprintf (stderr, "dp_right, q_start: %lu t_start: %lu lq: %d lt: %d\n",
-	     q_start, t_start, lq, lt);
+    int bt, bq;
 
-  M[TI (0, 0)] = 0;
-  best_e = (*S)[Q (0)][GAP][T (0)][GAP];
-  *best_i = 0;
-  *best_j = 0;
-  if (lq <= 1 || lt <= 1)
-    return best_e;
-
+    // Setup bands for restricted search
+	if (bands_flag){
+	    bt = min(bands , lt);
+	    bq = min(bands, lq);
+	    // init matrix NA
+        for (i = 0; i < lq; ++i)
+       	{
+            if (i <= bq +1){
+                M[TI (i, 0)] = NA;
+                Bt[TI (i, 0)] = NA;
+                Bt[TI (i, 1)] = NA;
+            }
+            if (i <= bt +1){
+                M[TI (0, i)] = NA;
+                Bq[TI (0, i)] = NA;
+                Bq[TI (1, i)] = NA;
+            }
+            js = i - bq - 1;
+            je = i + bt + 1;
+            if (js >= 0){
+                M[TI (i, js)] = NA;
+                Bq[TI (i, js)] = NA;
+                Bt[TI (i, js + 1)] = NA;
+            }
+            if (je < lt){
+                M[TI (i, je)] = NA;
+                Bq[TI (i+1, je)] = NA;
+                Bt[TI (i, je)] = NA;
+            }
+        }
+	}
+	else
+	{
+        bt = lt;
+        bq = lq;
   Bq[TI (0, 0)] = NA;
   Bt[TI (0, 0)] = NA;
   M[TI (0, 1)] = NA;
@@ -567,6 +1052,26 @@ DP_right (int *M,		//!<[out] DP matrix for match state
   Bt[TI (1, 0)] = NA;
   Bq[TI (1, 1)] = NA;
   Bt[TI (1, 1)] = NA;
+        for (j = 2; j < lt; ++j)
+       	{
+            M[TI (0, j)] = NA;
+            Bq[TI (0, j)] = NA;
+            Bq[TI (1, j)] = NA;
+        }
+        for (i = 2; i < lq; ++i)
+	{
+            M[TI (i, 0)] = NA;
+            Bt[TI (i, 0)] = NA;
+            Bt[TI (i, 1)] = NA;
+        }
+	}
+
+  M[TI (0, 0)] = 0;
+  best_e = (*S)[Q (0)][GAP][T(0)][GAP];
+  *best_i = 0;
+  *best_j = 0;
+  if (lq <= 1 || lt <= 1)
+  return best_e;
 
   Bt[TI (0, 1)] = (*S)[Q (0)][GAP][T (0)][T (1)];
   Bq[TI (1, 0)] = (*S)[Q (0)][Q (1)][T (0)][GAP];
@@ -579,15 +1084,13 @@ DP_right (int *M,		//!<[out] DP matrix for match state
     }
 
   //1. row (i=0), only Bt (gap in query) possible
-  for (j = 2; j < lt; ++j)
+  for (j = 2; j < min(lt, bt + 1); ++j)
     {
-      M[TI (0, j)] = NA;
-      Bq[TI (0, j)] = NA;
-      Bq[TI (1, j)] = NA;
-      //fprintf(stderr, "t_start + j: %d t_start: %d lt: %d\n", t_start + j, t_start, lt);
-      //fprintf(stderr, "TI(0,j): %d\n", TI(0,j));
       Bt[TI (0, j)] = Bt[TI (0, j - 1)] + (*S)[GAP][GAP][T (j - 1)][T (j)];
       M[TI (1, j)] = Bt[TI (0, j - 1)] + (*S)[GAP][Q (1)][T (j - 1)][T (j)];
+      if (j == bt){
+         M[TI (1, j + 1)] = Bt[TI (0, j)] + (*S)[GAP][Q (1)][T (j)][T (j + 1)];
+      }
       if (M[TI (1, j)] + (*S)[Q (1)][GAP][T (j)][GAP] > best_e)
 	{
 	  best_e = M[TI (1, j)] + (*S)[Q (1)][GAP][T (j)][GAP];
@@ -596,13 +1099,13 @@ DP_right (int *M,		//!<[out] DP matrix for match state
 	}
     }
   //1. col (j=0), only Bq (gap in target) possible
-  for (i = 2; i < lq; ++i)
+  for (i = 2; i < min(lq, bq + 1); ++i)
     {
-      M[TI (i, 0)] = NA;
-      Bt[TI (i, 0)] = NA;
-      Bt[TI (i, 1)] = NA;
       Bq[TI (i, 0)] = Bq[TI (i - 1, 0)] + (*S)[Q (i - 1)][Q (i)][GAP][GAP];
       M[TI (i, 1)] = Bq[TI (i - 1, 0)] + (*S)[Q (i - 1)][Q (i)][GAP][T (1)];
+      if (i == bq){
+      M[TI (i + 1, 1)] = Bq[TI (i, 0)] + (*S)[Q (i)][Q (i + 1)][GAP][T (1)];
+}
       if (M[TI (i, 1)] + (*S)[Q (i)][GAP][T (1)][GAP] > best_e)
 	{
 	  best_e = M[TI (i, 1)] + (*S)[Q (i)][GAP][T (1)][GAP];
@@ -612,7 +1115,16 @@ DP_right (int *M,		//!<[out] DP matrix for match state
     }
 
   if (lq <= 2 || lt <= 2)
+{
     return best_e;
+}
+
+    if (bq == 1){
+        M[TI (2, 1)] = Bq[TI (1, 0)] + (*S)[Q (1)][Q (2)][GAP][T (1)];
+    }
+    if (bt == 1){
+        M[TI (1, 2)] = Bt[TI (0, 1)] + (*S)[GAP][Q (1)][T (1)][T (2)];
+    }
 
   Bt[TI (1, 2)] = M[TI (1, 1)] + (*S)[Q (1)][GAP][T (1)][T (2)];
   Bq[TI (2, 1)] = M[TI (1, 1)] + (*S)[Q (1)][Q (2)][T (1)][GAP];
@@ -627,7 +1139,7 @@ DP_right (int *M,		//!<[out] DP matrix for match state
   Bt[TI (2, 2)] = M[TI (2, 1)] + (*S)[Q (2)][GAP][T (1)][T (2)];
 
   //initialize limited rows
-  for (j = 3; j < lt; ++j)
+  for (j = 3; j < min(lt , bt + 2); ++j)
     {
       //i=1: M already set; Bq is NA; Bt as in main recursion
       Bt[TI (1, j)] =
@@ -643,6 +1155,15 @@ DP_right (int *M,		//!<[out] DP matrix for match state
       Bt[TI (2, j)] =
 	max (M[TI (2, j - 1)] + (*S)[Q (2)][GAP][T (j - 1)][T (j)],
 	     Bt[TI (2, j - 1)] + (*S)[GAP][GAP][T (j - 1)][T (j)]);
+    if ((j == bt + 1) && (j < lt - 1))
+    {
+        Bt[TI (2, j + 1)] =
+ max (M[TI (2, j)] + (*S)[Q (2)][GAP][T (j)][T (j + 1)],
+Bt[TI (2, j)] + (*S)[GAP][GAP][T (j)][T (j + 1)]);
+        M[TI (2, j + 1)] =
+ max (M[TI (1, j)] + (*S)[Q (1)][Q (2)][T (j)][T (j + 1)],
+Bt[TI (1, j)] + (*S)[GAP][Q (2)][T (j)][T (j + 1)]);
+    }
       if (M[TI (2, j)] + (*S)[Q (2)][GAP][T (j)][GAP] > best_e)
 	{
 	  best_e = M[TI (2, j)] + (*S)[Q (2)][GAP][T (j)][GAP];
@@ -652,7 +1173,7 @@ DP_right (int *M,		//!<[out] DP matrix for match state
     }
 
   //initialize limited columns
-  for (i = 3; i < lq; ++i)
+  for (i = 3; i < min(lq, bq + 2); ++i)
     {
       //i=1: M already set; Bt is NA; Bq as in main recursion
       Bq[TI (i, 1)] =
@@ -668,17 +1189,39 @@ DP_right (int *M,		//!<[out] DP matrix for match state
       Bq[TI (i, 2)] =
 	max (M[TI (i - 1, 2)] + (*S)[Q (i - 1)][Q (i)][T (2)][GAP],
 	     Bq[TI (i - 1, 2)] + (*S)[Q (i - 1)][Q (i)][GAP][GAP]);
+    if ((i == bq + 1) && (i < lq - 1))
+    {
+        Bq[TI (i + 1, 2)] =
+ max (M[TI (i, 2)] + (*S)[Q (i)][Q (i + 1)][T (2)][GAP],
+Bq[TI (i, 2)] + (*S)[Q (i)][Q (i + 1)][GAP][GAP]);
+        M[TI (i + 1, 2)] =
+ max (M[TI (i, 1)] + (*S)[Q (i)][Q (i + 1)][T (1)][T (2)],
+Bq[TI (i, 1)] + (*S)[Q (i)][Q (i + 1)][GAP][T (2)]);
+    }
       if (M[TI (i, 2)] + (*S)[Q (i)][GAP][T (2)][GAP] > best_e)
 	{
 	  best_e = M[TI (i, 2)] + (*S)[Q (i)][GAP][T (2)][GAP];
 	  *best_i = i;
 	  *best_j = 2;
 	}
+  }
+
+    if (bt == 1) {
+        Bt[TI (2, 3)] =
+ max (M[TI (2, 2)] + (*S)[Q (2)][GAP][T (2)][T (3)], Bt[TI (2, 2)] + (*S)[GAP][GAP][T (2)][T (3)]);
+        M[TI (2, 3)] =
+ max (M[TI (1, 2)] + (*S)[Q (1)][Q (2)][T (2)][T (3)], Bt[TI (1, 2)] + (*S)[GAP][Q (2)][T (2)][T (3)]);
+    }
+    if (bq == 1){
+        Bq[TI (3, 2)] =
+ max (M[TI (2, 2)] + (*S)[Q (2)][Q (3)][T (2)][GAP], Bq[TI (2, 2)] + (*S)[Q (2)][Q (3)][GAP][GAP]);
+        M[TI (3, 2)] =
+ max (M[TI (2, 1)] + (*S)[Q (2)][Q (3)][T (1)][T (2)], Bq[TI (2, 1)] + (*S)[Q (2)][Q (3)][GAP][T (2)]);
     }
 
   for (i = 3; i < lq; ++i)
     {
-      for (j = 3; j < lt; ++j)
+    for (j = max (3, i - bq); j < min(lt, i + bt + 1); ++j)
 	{
 	  M[TI (i, j)] =
 	    max3 (M[TI (i - 1, j - 1)] +
@@ -686,13 +1229,12 @@ DP_right (int *M,		//!<[out] DP matrix for match state
 		  Bq[TI (i - 1, j - 1)] + (*S)[Q (i - 1)][Q (i)][GAP][T (j)],
 		  Bt[TI (i - 1, j - 1)] + (*S)[GAP][Q (i)][T (j - 1)][T (j)]);
 
-	  Bq[TI (i, j)] =
-	    max (M[TI (i - 1, j)] + (*S)[Q (i - 1)][Q (i)][T (j)][GAP],
-		 Bq[TI (i - 1, j)] + (*S)[Q (i - 1)][Q (i)][GAP][GAP]);
-	  Bt[TI (i, j)] =
-	    max (M[TI (i, j - 1)] + (*S)[Q (i)][GAP][T (j - 1)][T (j)],
-		 Bt[TI (i, j - 1)] + (*S)[GAP][GAP][T (j - 1)][T (j)]);
-
+            if ((j - i) < bt){
+                Bq[TI (i, j)] = max (M[TI (i - 1, j)] + (*S)[Q (i - 1)][Q (i)][T (j)][GAP], Bq[TI (i - 1, j)] + (*S)[Q (i - 1)][Q (i)][GAP][GAP]);
+            }
+            if ((i - j) < bq){
+                Bt[TI (i, j)] = max (M[TI (i, j - 1)] + (*S)[Q (i)][GAP][T (j - 1)][T (j)], Bt[TI (i, j - 1)] + (*S)[GAP][GAP][T (j - 1)][T (j)]);
+            }
 	  if (M[TI (i, j)] + (*S)[Q (i)][GAP][T (j)][GAP] > best_e)
 	    {
 	      best_e = M[TI (i, j)] + (*S)[Q (i)][GAP][T (j)][GAP];
@@ -714,7 +1256,7 @@ DP_right (int *M,		//!<[out] DP matrix for match state
       fprintf (stderr, "%4c%c ", 'x', 'x');
       fprintf (stderr, "%4c%c ", '-', '-');
       for (j = 1; j < lt; ++j)
-	fprintf (stderr, "%4c%c ", TSc (j - 1), TSc (j));
+	      fprintf (stderr, "%4c%c ", TSc (j - 1), TSc (j));
       fprintf (stderr, "\n");
       fprintf (stderr, "%4c%c ", '-', '-');
       for (j = 0; j < lt; ++j)
@@ -938,9 +1480,9 @@ print_alignment (const saidx64_t * sa,	//!<[in] Suffix array of the target
 
 	  if (Q (i) == T (j) && Q (i) != 5)	//same nt, not 'N'
 	    strcat (temp_aln_str, "|");
-	  else if (
-	    /*(noGUseed==0) & this would be necessary if you don't want to show G-Us with ":" */
-	    ((Q (i) == 2 && T (j) == 1) || (Q (i) == 4 && T (j) == 3)))
+			else if ((Q(i) == 2 && T(j) == 1) || (Q(i) == 4 && T(j) == 3))
+				//this would be necessary if you don't want to show G-Us with ":" */
+				// else if (*(noGUseed==0) && ((Q(i) == 2 && T(j) == 1) || (Q(i) == 4 && T(j) == 3)))
 	    //ga or uc corresponds to wobble as T is reversed
 	    strcat (temp_aln_str, ":");
 	  else
@@ -1099,9 +1641,9 @@ print_alignment (const saidx64_t * sa,	//!<[in] Suffix array of the target
 
 	  if (Q (i) == T (j) && Q (i) != 5)	// same nt, not 'N'
 	    strcat (temp_aln_str, "|");
-	  else if (
-	    /*(noGUseed==0) & this would be necessary if you don't want to show G-Us with ":" */
-	    ((Q (i) == 2 && T (j) == 1) || (Q (i) == 4 && T (j) == 3)))
+			else if ((Q(i) == 2 && T(j) == 1) || (Q(i) == 4 && T(j) == 3))
+				//this would be necessary if you don't want to show G-Us with ":" */
+				//else if ( (noGUseed==0) && ((Q(i) == 2 && T(j) == 1) || (Q(i) == 4 && T(j) == 3)))
 	    //ga or uc corresponds to wobble as T is reversed
 	    strcat (temp_aln_str, ":");
 	  else
@@ -1194,6 +1736,7 @@ print_alignment (const saidx64_t * sa,	//!<[in] Suffix array of the target
 #undef TS
 #undef TSc
 #undef TI
+#undef W
 
   /*
      result->query_str = query_str;
@@ -1202,6 +1745,295 @@ print_alignment (const saidx64_t * sa,	//!<[in] Suffix array of the target
    */
 }
 
+void print_alignment_weighted(const saidx64_t * sa,	//!<[in] Suffix array of the target
+		     const saidx64_t * qsa,	//!<[in] Suffix array of the query
+		     aln_result_t * result,	//!<[in,out] result struct: gets positions (seed and best dp), sets query/aln/target_str and new_ pos
+		     saidx64_t query_len,	//!<[in] Length of the query
+		     int seed_len,	//!<[in] Length of the seed
+		     int rem_query_len_left, //!<[in] Length of remaining query (height of DP matrices)
+		     float *M_left,	//!<[in] DP matrix for left extension, match state
+		     float *Bq_left,	//!<[in] DP matrix for left extension, query bulged state
+		     float *Bt_left,	//!<[in] DP matrix for left extension, target bulged state
+		     int *M_right,	//!<[in] DP matrix for right extension, match state
+		     int *Bq_right,	//!<[in] DP matrix for right extension, query bulged state
+		     int *Bt_right,	//!<[in] DP matrix for right extension, target bulged state
+	         float *weights) //! Array of weights
+{
+	// MISMATCH UPDATE
+	int q_seed_len = seed_len, t_seed_len = seed_len, qi, ti;
+
+	int i, j, state = MA;
+
+	char *query_str = result->query_str;
+	char *temp_query_str = result->temp_query_str;
+	char *aln_str = result->aln_str;
+	char *temp_aln_str = result->temp_aln_str;
+	char *target_str = result->target_str;
+	char *temp_target_str = result->temp_target_str;
+	char buf[4];
+	saidx64_t idx;
+
+	int rem_target_len_left = 0;
+	int rem_target_len_right = 0;
+
+	*temp_query_str = 0;
+	*temp_aln_str = 0;
+	*temp_target_str = 0;
+	*query_str = 0;
+	*aln_str = 0;
+	*target_str = 0;
+
+	saidx64_t q_start = XSA(qsa[result->k]);
+	saidx64_t t_start = XSA(sa[result->j]);
+
+	idx = XIDX(sa[result->j]);
+
+	rem_target_len_left = min(	// general limiting parameter
+					 max_ext_len,
+					 // prevent run in previous seq
+					 t_start - sum_l[idx] + 1);
+
+	rem_target_len_right = min(	// general limiting parameter
+					  max_ext_len,
+					  // prevent overrun into next sequence / out of last
+					  sum_l[idx + 1] - (t_start + t_seed_len - 1));
+
+/*** backtrack left ***/
+
+#define Q(ix) (XRIS(qsa[q_start-(ix)]))
+#define T(ix) (XRIS(sa[t_start-(ix)]))
+#define Tc(ix) (comp[T(ix)])
+#define QS(ix) (XSTR(qsa[q_start-(ix)]))
+#define TS(ix) (XSTR(sa[t_start-(ix)]))
+#define TSc(ix) (scomp[TS(ix)])
+#define TI(q,t) ((q)*(rem_target_len_left) + (t))
+#define W(ix) (query_len - rem_query_len_left + (ix))
+
+
+	i = result->best_left_i;
+	j = result->best_left_j;
+
+	result->new_left = t_start - j;
+	result->q_new_left = q_start - i;
+
+	if (print_debug)
+		fprintf(stderr, "printing, backtrack left from i: %d j: %d t_start: %lu\n", i, j, t_start);
+
+	state = MA;
+
+	while (i > 0 || j > 0) {
+		if (state == MA) {
+			sprintf(buf, "%c", QS(i));
+			strcat(temp_query_str, buf);
+
+			if (Q(i) == T(j) && Q(i) != 5)	//same nt, not 'N'
+				strcat(temp_aln_str, "|");
+			else if ((Q(i) == 2 && T(j) == 1) || (Q(i) == 4 && T(j) == 3))
+				//this would be necessary if you don't want to show G-Us with ":" */
+			// else if (*(noGUseed==0) && ((Q(i) == 2 && T(j) == 1) || (Q(i) == 4 && T(j) == 3)))
+				//ga or uc corresponds to wobble as T is reversed
+				strcat(temp_aln_str, ":");
+			else
+				strcat(temp_aln_str, " ");
+
+			sprintf(buf, "%c", TSc(j));
+			strcat(temp_target_str, buf);
+            if (M_left[TI(i, j)] == M_left[TI(i - 1, j - 1)] + (*S)[Q(i)][Q(i - 1)][Tc(j)][Tc(j - 1)] * weights[W(i - 1)]) {
+                state = MA;
+            } else if (M_left[TI(i, j)] == Bq_left[TI(i - 1, j - 1)] + (*S)[Q(i)][Q(i - 1)][Tc(j)][GAP] * weights[W(i - 1)]) {
+                state = BQ;
+            } else if (M_left[TI(i, j)] == Bt_left[TI(i - 1, j - 1)] + (*S)[Q(i)][GAP][Tc(j)][Tc(j - 1)] * weights[W(i - 1)]) {
+                state = BT;
+            }
+			i--;
+			j--;
+		} else if (state == BQ) {
+			sprintf(buf, "%c", QS(i));
+			strcat(temp_query_str, buf);
+			strcat(temp_aln_str, " ");
+			sprintf(buf, "-");
+			strcat(temp_target_str, buf);
+            if (Bq_left[TI(i, j)] == M_left[TI(i - 1, j)] + (*S)[Q(i)][Q(i - 1)][GAP][Tc(j)] * weights[W(i - 1)]) {
+                state = MA;
+                i--;
+            } else if (Bq_left[TI(i, j)] == Bq_left[TI(i - 1, j)] + (*S)[Q(i)][Q(i - 1)][GAP][GAP] * weights[W(i - 1)]) {
+                state = BQ;
+                i--;
+            }
+
+		} else if (state == BT) {
+			sprintf(buf, "-");
+			strcat(temp_query_str, buf);
+			strcat(temp_aln_str, " ");
+			sprintf(buf, "%c", TSc(j));
+			strcat(temp_target_str, buf);
+            if (Bt_left[TI(i, j)] == M_left[TI(i, j - 1)] + (*S)[GAP][Q(i)][Tc(j)][Tc(j - 1)] * ((weights[W(i - 1)] + weights[W(i)])/2)) {
+                state = MA;
+                j--;
+            } else if (Bt_left[TI(i, j)] == Bt_left[TI(i, j - 1)] + (*S)[GAP][GAP][Tc(j)][Tc(j - 1)] * ((weights[W(i - 1)] + weights[W(i)])/2)) {
+                state = BT;
+                j--;
+            }
+		}
+	}
+
+	strcat(query_str, temp_query_str);
+	strcat(aln_str, temp_aln_str);
+	strcat(target_str, temp_target_str);
+
+	*temp_query_str = 0;
+	*temp_aln_str = 0;
+	*temp_target_str = 0;
+#undef Q
+#undef QS
+#undef T
+#undef Tc
+#undef TS
+#undef TSc
+#undef TI
+#undef W
+
+#define Q(ix) (XRIS(qsa[q_start+(ix)]))
+#define QS(ix) (XSTR(qsa[q_start+(ix)]))
+#define T(ix) (XRIS(sa[t_start+(ix)]))
+#define Tc(ix) (comp[T(ix)])
+#define TS(ix) (XSTR(sa[t_start+(ix)]))
+#define TSc(ix) (scomp[TS(ix)])
+#define TI(q,t) ((q)*(rem_target_len_right) + (t))
+/*** seed interaction ***/
+
+	if (print_debug) {
+		strcat(query_str, "y");
+		strcat(aln_str, "y");
+		strcat(target_str, "y");
+	}
+
+	for (i = 0; i < seed_len; i++) {
+		qi = i;
+		ti = i;
+
+		sprintf(buf, "%c", QS(qi));
+		strcat(query_str, buf);
+		if (Q(qi) == T(ti))
+			strcat(aln_str, "|");
+		else if (pair[Q(qi)][Tc(ti)])
+			strcat(aln_str, ":");
+		else
+			strcat(aln_str, " ");
+		sprintf(buf, "%c", TSc(ti));
+		strcat(target_str, buf);
+	}
+	if (print_debug) {
+		strcat(query_str, "x");
+		strcat(aln_str, "x");
+		strcat(target_str, "x");
+	}
+
+/*** backtrack right ***/
+
+    int *M;
+	int *Bq;
+	int *Bt;
+
+	M = M_right;
+	Bq = Bq_right;
+	Bt = Bt_right;
+
+	t_start = t_start + t_seed_len - 1;
+	q_start = q_start + q_seed_len - 1;
+
+	i = result->best_right_i;
+	j = result->best_right_j;
+
+	result->new_right = t_start + j;
+	result->q_new_right = q_start + i;
+
+	if (print_debug)
+		fprintf(stderr, "printing, backtrack right from i: %d j: %d t_start: %lu \n", i, j, t_start);
+
+	state = MA;
+
+	while (i > 0 || j > 0) {
+		if (state == MA) {
+			sprintf(buf, "%c", QS(i));
+			strcat(temp_query_str, buf);
+
+			if (Q(i) == T(j) && Q(i) != 5)	// same nt, not 'N'
+				strcat(temp_aln_str, "|");
+			else if ((Q(i) == 2 && T(j) == 1) || (Q(i) == 4 && T(j) == 3))
+			//this would be necessary if you don't want to show G-Us with ":" */
+			//else if ( (noGUseed==0) & ((Q(i) == 2 && T(j) == 1) || (Q(i) == 4 && T(j) == 3)))
+				//ga or uc corresponds to wobble as T is reversed
+				strcat(temp_aln_str, ":");
+			else
+				strcat(temp_aln_str, " ");
+
+			sprintf(buf, "%c", TSc(j));
+			strcat(temp_target_str, buf);
+
+			if (M[TI(i, j)] == M[TI(i - 1, j - 1)] + (*S)[Q(i - 1)][Q(i)][Tc(j - 1)][Tc(j)]) {
+				state = MA;
+			} else if (M[TI(i, j)] == Bq[TI(i - 1, j - 1)] + (*S)[Q(i - 1)][Q(i)][GAP][Tc(j)]) {
+				state = BQ;
+			} else if (M[TI(i, j)] == Bt[TI(i - 1, j - 1)] + (*S)[GAP][Q(i)][Tc(j - 1)][Tc(j)]) {
+				state = BT;
+			}
+			i--;
+			j--;
+		} else if (state == BQ) {
+			sprintf(buf, "%c", QS(i));
+			strcat(temp_query_str, buf);
+			strcat(temp_aln_str, " ");
+			sprintf(buf, "-");
+			strcat(temp_target_str, buf);
+			if (Bq[TI(i, j)] == M[TI(i - 1, j)] + (*S)[Q(i - 1)][Q(i)][Tc(j)][GAP]) {
+				state = MA;
+				i--;
+			} else if (Bq[TI(i, j)] == Bq[TI(i - 1, j)] + (*S)[Q(i - 1)][Q(i)][GAP][GAP]) {
+				state = BQ;
+				i--;
+			}
+		} else if (state == BT) {
+			sprintf(buf, "-");
+			strcat(temp_query_str, buf);
+			strcat(temp_aln_str, " ");
+			sprintf(buf, "%c", TSc(j));
+			strcat(temp_target_str, buf);
+			if (Bt[TI(i, j)] == M[TI(i, j - 1)] + (*S)[Q(i)][GAP][Tc(j - 1)][Tc(j)]) {
+				state = MA;
+				j--;
+			} else if (Bt[TI(i, j)] == Bt[TI(i, j - 1)] + (*S)[GAP][GAP][Tc(j - 1)][Tc(j)]) {
+				state = BT;
+				j--;
+			}
+		}
+	}
+
+
+
+  str_rev (temp_query_str);
+  str_rev (temp_aln_str);
+  str_rev (temp_target_str);
+
+  strcat (query_str, temp_query_str);
+  strcat (aln_str, temp_aln_str);
+  strcat (target_str, temp_target_str);
+
+#undef Q
+#undef QS
+#undef T
+#undef Tc
+#undef TS
+#undef TSc
+#undef TI
+#undef W
+
+  /*
+     result->query_str = query_str;
+     result->aln_str = aln_str;
+     result->target_str = target_str;
+   */
+}
 
 /**
  * @brief Backtrack to get the condensed interacting string for output
@@ -1500,6 +2332,250 @@ print_ali2 (const saidx64_t * sa,	//!<[in] Suffix array of the target
   strcat (ia_str, temp_ia_str);
 }
 
+void print_ali2_weighted(const saidx64_t * sa,	//!<[in] Suffix array of the target
+		const saidx64_t * qsa,	//!<[in] Suffix array of the query
+		aln_result_t * result,	//!<[in,out] result struct: gets positions (seed and best dp), sets ia_str and new_ pos
+		saidx64_t query_len,	//!<[in] Length of the query
+		int seed_len,	//!<[in] Length of the seed
+		int rem_query_len_left, //!<[in] Length of remaining query (height of DP matrices)
+		float *M_left,	//!<[in] DP matrix for left extension, match state
+		float *Bq_left,	//!<[in] DP matrix for left extension, query bulged state
+		float *Bt_left,	//!<[in] DP matrix for left extension, target bulged state
+		int *M_right,	//!<[in] DP matrix for right extension, match state
+		int *Bq_right,	//!<[in] DP matrix for right extension, query bulged state
+		int *Bt_right,	//!<[in] DP matrix for right extension, target bulged state
+	    float *weights) //! Array of weights
+{
+	// MISMATCH UPDATE
+	int q_seed_len = seed_len, t_seed_len = seed_len, qi, ti;
+
+	int i, j, state = MA;
+
+	char *ia_str = result->ia_str;
+	char *temp_ia_str = result->temp_ia_str;
+	saidx64_t idx;
+
+	int rem_target_len_left = 0;
+	int rem_target_len_right = 0;
+
+	*temp_ia_str = 0;
+	*ia_str = 0;
+
+	saidx64_t q_start = XSA(qsa[result->k]);
+	saidx64_t t_start = XSA(sa[result->j]);
+
+	idx = XIDX(sa[result->j]);
+
+	rem_target_len_left = min(	// general limiting parameter
+					 max_ext_len,
+					 // prevent run in previous seq
+					 t_start - sum_l[idx] + 1);
+
+	rem_target_len_right = min(	// general limiting parameter
+					  max_ext_len,
+					  // prevent overrun into next sequence / out of last
+					  sum_l[idx + 1] - (t_start + t_seed_len - 1));
+
+
+/*** backtrack left ***/
+
+#define Q(ix) (XRIS(qsa[q_start-(ix)]))
+#define T(ix) (XRIS(sa[t_start-(ix)]))
+#define Tc(ix) (comp[T(ix)])
+//#define QS(ix) (XSTR(qsa[q_start-(ix)]))
+//#define TS(ix) (XSTR(sa[t_start-(ix)]))
+#define TI(q,t) ((q)*(rem_target_len_left) + (t))
+#define W(ix) (query_len - rem_query_len_left + (ix))
+
+	i = result->best_left_i;
+	j = result->best_left_j;
+
+	result->new_left = t_start - j;
+	result->q_new_left = q_start - i;
+
+	if (print_debug){
+		fprintf(stderr, "printing, backtrack left from i: %d j: %d t_start: %lu\n", i, j, t_start);
+        fprintf(stderr, "position weight %d\n", (seed_len-1));
+    }
+	state = MA;
+
+	while (i > 0 || j > 0) {
+		//fprintf(stderr, "M[TI(%d,%d)]: %f state: %d\n", i, j, M_left[TI(i,j)], state);
+		//fprintf(stderr, "seed: %d\n", (int) query_len - rem_query_len_left);
+		if (state == MA) {
+
+			if (Q(i) == T(j) && Q(i) != 5)	//same nt, not 'N'
+				strcat(ia_str, "P");
+			else if ((Q(i) == 2 && T(j) == 1) || (Q(i) == 4 && T(j) == 3))
+				//ga or uc corresponds to wobble as T is reversed
+				strcat(ia_str, "W");
+			else
+				strcat(ia_str, "U");
+            if (M_left[TI(i, j)] == M_left[TI(i - 1, j - 1)] + (*S)[Q(i)][Q(i - 1)][Tc(j)][Tc(j - 1)] * weights[W(i - 1)]) {
+                state = MA;
+            } else if (M_left[TI(i, j)] == Bq_left[TI(i - 1, j - 1)] + (*S)[Q(i)][Q(i - 1)][Tc(j)][GAP] * weights[W(i - 1)]) {
+                state = BQ;
+            } else if (M_left[TI(i, j)] == Bt_left[TI(i - 1, j - 1)] + (*S)[Q(i)][GAP][Tc(j)][Tc(j - 1)] * weights[W(i - 1)]) {
+                state = BT;
+            }
+            else{
+                printf("\nThis should not happen. Backtrack problem. See info below.\n");
+                printf("Weight pos = %d", (int) W(i - 1));
+                printf("\nWEIGHT=%f\n",weights[W(i-1)]);
+                printf("Val M=%f\n",M_left[TI(i - 1, j - 1)] + (*S)[Q(i)][Q(i - 1)][Tc(j)][Tc(j - 1)] * weights[W(i - 1)]);
+                printf("Val Bq=%f\n",Bq_left[TI(i - 1, j - 1)] + (*S)[Q(i)][Q(i - 1)][Tc(j)][GAP] * weights[W(i - 1)]);
+                printf("Val Bt=%f\n",Bt_left[TI(i - 1, j - 1)] + (*S)[Q(i)][GAP][Tc(j)][Tc(j - 1)] * weights[W(i - 1)]);
+                }
+			i--;
+			j--;
+		} else if (state == BQ) {
+			/* sprintf(buf, "%c", QS(i)) >> query_str ;  "-" >> target_str ; */
+			strcat(ia_str, "Q");
+            if (Bq_left[TI(i, j)] == M_left[TI(i - 1, j)] + (*S)[Q(i)][Q(i - 1)][GAP][Tc(j)] * weights[W(i - 1)]) {
+                state = MA;
+                i--;
+            } else if (Bq_left[TI(i, j)] == Bq_left[TI(i - 1, j)] + (*S)[Q(i)][Q(i - 1)][GAP][GAP] * weights[W(i - 1)]) {
+                state = BQ;
+                i--;
+            }
+            else{
+                printf("\nThis should not happen. Backtrack problem. See info below.\n");
+                printf("WEIGHT BQ used=%f\n",weights[W(i-1)]);
+                }
+
+		} else if (state == BT) {
+			/* sprintf(buf, "%c", TSc(j)) >> target_str ;  "-" >> query_str ; */
+			strcat(ia_str, "T");
+
+            if (Bt_left[TI(i, j)] == M_left[TI(i, j - 1)] + (*S)[GAP][Q(i)][Tc(j)][Tc(j - 1)] * ((weights[W(i-1)]+weights[W(i)])/2)) {
+                state = MA;
+                j--;
+            } else if (Bt_left[TI(i, j)] == Bt_left[TI(i, j - 1)] + (*S)[GAP][GAP][Tc(j)][Tc(j - 1)] * ((weights[W(i-1)]+weights[W(i)])/2)) {
+                state = BT;
+                j--;
+            }
+            else{
+                printf("\nThis should not happen. Backtrack problem. See info below.\n");
+                printf("WEIGHT BT used=%f\n",weights[W(i-1)]);
+                }
+		}
+	}
+
+#undef Q
+#undef T
+#undef Tc
+#undef TI
+#undef W
+
+#define Q(ix) (XRIS(qsa[q_start+(ix)]))
+//#define QS(ix) (XSTR(qsa[q_start+(ix)]))
+#define T(ix) (XRIS(sa[t_start+(ix)]))
+#define Tc(ix) (comp[T(ix)])
+//#define TS(ix) (XSTR(sa[t_start+(ix)]))
+//#define TSc(ix) (scomp[TS(ix)])
+#define TI(q,t) ((q)*(rem_target_len_right) + (t))
+/*** seed interaction ***/
+
+	if (print_debug) {
+		strcat(ia_str, "y");
+	}
+
+	for (i = 0; i < seed_len; i++) {
+		qi = i;
+		ti = i;
+
+		if (Q(qi) == T(ti))
+			strcat(ia_str, "P");
+		else if (pair[Q(qi)][Tc(ti)])
+			strcat(ia_str, "W");
+		else
+			strcat(ia_str, "U");
+	}
+
+	if (print_debug) {
+		strcat(ia_str, "x");
+	}
+
+/*** backtrack right ***/
+
+	int *M;
+	int *Bq;
+	int *Bt;
+
+	M = M_right;
+	Bq = Bq_right;
+	Bt = Bt_right;
+
+	t_start = t_start + t_seed_len - 1;
+	q_start = q_start + q_seed_len - 1;
+
+	i = result->best_right_i;
+	j = result->best_right_j;
+
+	result->new_right = t_start + j;
+	result->q_new_right = q_start + i;
+
+	if (print_debug)
+		fprintf(stderr, "printing, backtrack right from i: %d j: %d t_start: %lu\n", i, j, t_start);
+
+	state = MA;
+
+	while (i > 0 || j > 0) {
+		if (state == MA) {
+			if (Q(i) == T(j) && Q(i) != 5)	//same nt, not 'N'
+				strcat(temp_ia_str, "P");
+			else if ((Q(i) == 2 && T(j) == 1) || (Q(i) == 4 && T(j) == 3))
+				strcat(temp_ia_str, "W");
+			else
+				strcat(temp_ia_str, "U");
+
+			if (M[TI(i, j)] == M[TI(i - 1, j - 1)] + (*S)[Q(i - 1)][Q(i)][Tc(j - 1)][Tc(j)]) {
+				state = MA;
+			} else if (M[TI(i, j)] == Bq[TI(i - 1, j - 1)] + (*S)[Q(i - 1)][Q(i)][GAP][Tc(j)]) {
+				state = BQ;
+
+			} else if (M[TI(i, j)] == Bt[TI(i - 1, j - 1)] + (*S)[GAP][Q(i)][Tc(j - 1)][Tc(j)]) {
+				state = BT;
+			}
+			i--;
+			j--;
+		} else if (state == BQ) {
+			/* sprintf(buf, "%c", QS(i)) >> query_str ;  "-" >> target_str ; */
+			strcat(temp_ia_str, "Q");
+
+			if (Bq[TI(i, j)] == M[TI(i - 1, j)] + (*S)[Q(i - 1)][Q(i)][Tc(j)][GAP]) {
+				state = MA;
+				i--;
+			} else if (Bq[TI(i, j)] == Bq[TI(i - 1, j)] + (*S)[Q(i - 1)][Q(i)][GAP][GAP]) {
+				state = BQ;
+				i--;
+			}
+		} else if (state == BT) {
+			/* sprintf(buf, "%c", TSc(j)) >> target_str ;  "-" >> query_str ; */
+			strcat(temp_ia_str, "T");
+
+			if (Bt[TI(i, j)] == M[TI(i, j - 1)] + (*S)[Q(i)][GAP][Tc(j - 1)][Tc(j)]) {
+				state = MA;
+				j--;
+			} else if (Bt[TI(i, j)] == Bt[TI(i, j - 1)] + (*S)[GAP][GAP][Tc(j - 1)][Tc(j)]) {
+				state = BT;
+				j--;
+			}
+		}
+	}
+
+#undef Q
+//#undef QS
+#undef T
+#undef Tc
+//#undef TS
+//#undef TSc
+#undef TI
+
+  str_rev (temp_ia_str);
+  strcat (ia_str, temp_ia_str);
+}
+
 void
 print_result (char *qname, const saidx64_t * sa, const saidx64_t * qsa,
 	      aln_result_t * result)
@@ -1636,350 +2712,551 @@ really_print_alignment (gzFile qout, aln_result_t * result)
  * 
  * @return Void.
  */
-void
-extend_seed (saidx64_t j,	//!< Index in target suffix array (where seed match was found)
-	     saidx64_t k,	//!< Index in query suffix array (where seed match was found)
-	     const saidx64_t * sa,	//!< Suffix array of the target
-	     const saidx64_t * qsa,	//!< Suffix array of the query
-	     aln_result_t * result,	//!< result struct, fill in positions 
-	     int seed_score,	//!< Score of the seed match
-	     saidx64_t query_len,	//!< Length of the query, target length is in sum_l table
-	     int seed_len,	//!< Length of the seed
-	     saidx64_t best_spos,	//!< Start pos. of the most energy favourable subseed within any seed
-	     int best_seed_len,	//!< Length of the most energy favourable subseed
-	     int best_seed_score,	//!< Score of the most energy favourable subseed
-	     char *qname,	//!< Name of the query sequence
-	     int *seed,		//!< normalized (query-specific) seed info (m:n/l)
-	     int *M_left,	//!< DP matrix for left extension, match state
-	     int *Bq_left,	//!< DP matrix for left extension, query bulged state
-	     int *Bt_left,	//!< DP matrix for left extension, target bulged state
-	     int *M_right,	//!< DP matrix for right extension, match state
-	     int *Bq_right,	//!< DP matrix for right extension, query bulged state
-	     int *Bt_right)	//!< DP matrix for right extension, target bulged state
+void extend_seed(saidx64_t j,	//!< Index in target suffix array (where seed match was found)
+		 saidx64_t k,	//!< Index in query suffix array (where seed match was found)
+		 const saidx64_t * sa,	//!< Suffix array of the target
+		 const saidx64_t * qsa,	//!< Suffix array of the query
+		 aln_result_t * result,	//!< result struct, fill in positions
+		 int seed_score,	//!< Score of the seed match
+		 saidx64_t query_len,	//!< Length of the query, target length is in sum_l table
+		 int seed_len,	//!< Length of the seed
+		 saidx64_t best_spos,	//!< Start pos. of the most energy favourable subseed within any seed
+		 int best_seed_len,	//!< Length of the most energy favourable subseed
+		 int best_seed_score,	//!< Score of the most energy favourable subseed
+		 char *qname,	//!< Name of the query sequence
+		 int *seed,	//!< normalized (query-specific) seed info (m:n/l)
+		 int *M_left,	//!< DP matrix for left extension, match state
+		 int *Bq_left,	//!< DP matrix for left extension, query bulged state
+		 int *Bt_left,	//!< DP matrix for left extension, target bulged state
+		 int *M_right,	//!< DP matrix for right extension, match state
+		 int *Bq_right,	//!< DP matrix for right extension, query bulged state
+		 int *Bt_right)	//!< DP matrix for right extension, target bulged state
 {
-  int q_seed_len = seed_len, t_seed_len = seed_len;
-  int total_score = seed_score;
-  saidx64_t best_left_i = 0, best_left_j = 0, best_right_i = 0, best_right_j =
-    0;
+	int q_seed_len = seed_len, t_seed_len = seed_len;
+	int total_score = seed_score;
+	saidx64_t best_left_i = 0, best_left_j = 0, best_right_i = 0, best_right_j = 0;
 
-  result->found = 0;
+	result->found = 0;
 
-  // get 0-based suffix numbers for query and target, and get seq id of the target region
-  saidx64_t q_start = XSA (qsa[k]);
-  saidx64_t t_start = XSA (sa[j]);
-  saidx64_t idx = XIDX (sa[j]);
+	// get 0-based suffix numbers for query and target, and get seq id of the target region
+	saidx64_t q_start = XSA(qsa[k]);
+	saidx64_t t_start = XSA(sa[j]);
+	saidx64_t idx = XIDX(sa[j]);
 
-  //* get remaining lengths for left and right maximality check (min=0)
-  int rem_query_len_left = q_start;
-  int rem_target_len_left = t_start - sum_l[idx];
-  int rem_query_len_right = query_len - (q_seed_len + q_start);
-  int rem_target_len_right = sum_l[idx + 1] - (t_start + t_seed_len);
+	//* get remaining lengths for left and right maximality check (min=0)
+	int rem_query_len_left = q_start;
+	int rem_target_len_left = t_start - sum_l[idx];
+	int rem_query_len_right = query_len - (q_seed_len + q_start);
+	int rem_target_len_right = sum_l[idx + 1] - (t_start + t_seed_len);
 
-  if (print_debug)
-    fprintf (stderr, "analyzing q_seed:%lu-%lu, t_start: %lu \n ",
-	     q_start + 1, q_start + q_seed_len, t_start);
+	if (print_debug)
+		fprintf(stderr, "analyzing q_seed:%lu-%lu, t_start: %lu \n ", q_start + 1, q_start + q_seed_len, t_start);
 
 #define Q(ix) (XRIS(qsa[q_start+(ix)]))
 #define T(ix) (comp[XRIS(sa[t_start+(ix)])])
-  // test whether seed is flanked on left or right by a valid base pair
-  // Maximal Test is different when seed is limited to some region
-  // in that case, left maximality is important only if seed starts in mid positions. seed_flag determines if there is a positional constraint
-  if (noGUseed)
-    {
-      if (seed_flag)
-	{
-	  if (q_start + 1 < seed[0] || q_start + q_seed_len > seed[1])
-	    {
-	      if (print_debug)
-		{
-		  fprintf (stderr,
-			   "extension stopped due to start/end position for q_seed:%lu-%lu,  rem_query_len_left: %d, rem_query_len_right: %d, rem_target_len_left: %d, rem_target_len_right: %d \n",
-			   q_start + 1, q_start + q_seed_len,
-			   rem_query_len_left, rem_query_len_right,
-			   rem_target_len_left, rem_target_len_right);
-		}
-	      // extension stops due to start or end position
-	      return;
-	    }
+	// test whether seed is flanked on left or right by a valid base pair
+	// Maximal Test is different when seed is limited to some region
+	// in that case, left maximality is important only if seed starts in mid positions. seed_flag determines if there is a positional constraint
+	if (noGUseed) {
+		if (seed_flag) {
+			if (q_start + 1 < seed[0] || q_start + q_seed_len > seed[1]) {
+				if (print_debug) {
+					fprintf(stderr,
+						"extension stopped due to start/end position for q_seed:%lu-%lu,  rem_query_len_left: %d, rem_query_len_right: %d, rem_target_len_left: %d, rem_target_len_right: %d \n",
+						q_start + 1, q_start + q_seed_len, rem_query_len_left, rem_query_len_right,
+						rem_target_len_left, rem_target_len_right);
+				}
+				// extension stops due to start or end position
+				return;
+			}
 
-	  if ((rem_query_len_left - (seed[0] - 1) > 0
-	       && rem_target_len_left > 0 && pair_noGU[Q (-1)][T (-1)])
-	      || (rem_query_len_right - (query_len - seed[1]) > 0
-		  && rem_target_len_right > 0
-		  && pair_noGU[Q (q_seed_len)][T (t_seed_len)]))
-	    {
-	      if (print_debug)
-		{
-		  fprintf (stderr,
-			   "extension stopped due to maximality for q_seed:%lu-%lu,  rem_query_len_left: %d, rem_query_len_right: %d, rem_target_len_left: %d, rem_target_len_right: %d \n",
-			   q_start + 1, q_start + q_seed_len,
-			   rem_query_len_left, rem_query_len_right,
-			   rem_target_len_left, rem_target_len_right);
+			if ((rem_query_len_left - (seed[0] - 1) > 0 && rem_target_len_left > 0 && pair_noGU[Q(-1)][T(-1)])
+			    || (rem_query_len_right - (query_len - seed[1]) > 0 && rem_target_len_right > 0
+				&& pair_noGU[Q(q_seed_len)][T(t_seed_len)])) {
+				if (print_debug) {
+					fprintf(stderr,
+						"extension stopped due to maximality for q_seed:%lu-%lu,  rem_query_len_left: %d, rem_query_len_right: %d, rem_target_len_left: %d, rem_target_len_right: %d \n",
+						q_start + 1, q_start + q_seed_len, rem_query_len_left, rem_query_len_right,
+						rem_target_len_left, rem_target_len_right);
+				}
+				// extension stops due to maximality within the seed
+				return;
+			}
+		} else if ((rem_query_len_left > 0 && rem_target_len_left > 0 && pair_noGU[Q(-1)][T(-1)])
+			   || (rem_query_len_right > 0 && rem_target_len_right > 0 && pair_noGU[Q(q_seed_len)][T(t_seed_len)])) {
+			if (print_debug) {
+				fprintf(stderr, "stop extension whether maximality or str/end position! %lu %lu %d %d\n", q_start,
+					t_start, q_seed_len, t_seed_len);
+			}
+			return;
 		}
-	      // extension stops due to maximality within the seed
-	      return;
-	    }
-	}
-      else
-	if ((rem_query_len_left > 0 && rem_target_len_left > 0
-	     && pair_noGU[Q (-1)][T (-1)]) || (rem_query_len_right > 0
-					       && rem_target_len_right > 0
-					       &&
-					       pair_noGU[Q (q_seed_len)][T
-									 (t_seed_len)]))
-	{
-	  if (print_debug)
-	    {
-	      fprintf (stderr,
-		       "stop extension whether maximality or str/end position! %lu %lu %d %d\n",
-		       q_start, t_start, q_seed_len, t_seed_len);
-	    }
-	  return;
-	}
-    }
-  else
-    {
-      if (seed_flag)
-	{
-	  if (q_start + 1 < seed[0] || q_start + q_seed_len > seed[1])
-	    {
-	      if (print_debug)
-		{
-		  fprintf (stderr,
-			   "extension stopped due to start/end position for q_seed:%lu-%lu,  rem_query_len_left: %d, rem_query_len_right: %d, rem_target_len_left: %d, rem_target_len_right: %d \n",
-			   q_start + 1, q_start + q_seed_len,
-			   rem_query_len_left, rem_query_len_right,
-			   rem_target_len_left, rem_target_len_right);
-		}
-	      // extension stops due to start or end position
-	      return;
-	    }
+	} else {
+		if (seed_flag) {
+			if (q_start + 1 < seed[0] || q_start + q_seed_len > seed[1]) {
+				if (print_debug) {
+					fprintf(stderr,
+						"extension stopped due to start/end position for q_seed:%lu-%lu,  rem_query_len_left: %d, rem_query_len_right: %d, rem_target_len_left: %d, rem_target_len_right: %d \n",
+						q_start + 1, q_start + q_seed_len, rem_query_len_left, rem_query_len_right,
+						rem_target_len_left, rem_target_len_right);
+				}
+				// extension stops due to start or end position
+				return;
+			}
 
-	  if ((rem_query_len_left - (seed[0] - 1) > 0
-	       && rem_target_len_left > 0 && pair[Q (-1)][T (-1)])
-	      || (rem_query_len_right - (query_len - seed[1]) > 0
-		  && rem_target_len_right > 0
-		  && pair[Q (q_seed_len)][T (t_seed_len)]))
-	    {
-	      if (print_debug)
-		{
-		  fprintf (stderr,
-			   "extension stopped due to maximality for q_seed:%lu-%lu,  rem_query_len_left: %d, rem_query_len_right: %d, rem_target_len_left: %d, rem_target_len_right: %d \n",
-			   q_start + 1, q_start + q_seed_len,
-			   rem_query_len_left, rem_query_len_right,
-			   rem_target_len_left, rem_target_len_right);
+			if ((rem_query_len_left - (seed[0] - 1) > 0 && rem_target_len_left > 0 && pair[Q(-1)][T(-1)])
+			    || (rem_query_len_right - (query_len - seed[1]) > 0 && rem_target_len_right > 0
+				&& pair[Q(q_seed_len)][T(t_seed_len)])) {
+				if (print_debug) {
+					fprintf(stderr,
+						"extension stopped due to maximality for q_seed:%lu-%lu,  rem_query_len_left: %d, rem_query_len_right: %d, rem_target_len_left: %d, rem_target_len_right: %d \n",
+						q_start + 1, q_start + q_seed_len, rem_query_len_left, rem_query_len_right,
+						rem_target_len_left, rem_target_len_right);
+				}
+				// extension stops due to maximality within the seed
+				return;
+			}
+		} else if ((rem_query_len_left > 0 && rem_target_len_left > 0 && pair[Q(-1)][T(-1)])
+			   || (rem_query_len_right > 0 && rem_target_len_right > 0 && pair[Q(q_seed_len)][T(t_seed_len)])) {
+			if (print_debug) {
+				fprintf(stderr, "stop extension whether maximality or str/end position! %lu %lu %d %d\n", q_start,
+					t_start, q_seed_len, t_seed_len);
+			}
+			return;
 		}
-	      // extension stops due to maximality within the seed
-	      return;
-	    }
 	}
-      else
-	if ((rem_query_len_left > 0 && rem_target_len_left > 0
-	     && pair[Q (-1)][T (-1)]) || (rem_query_len_right > 0
-					  && rem_target_len_right > 0
-					  &&
-					  pair[Q (q_seed_len)][T
-							       (t_seed_len)]))
-	{
-	  if (print_debug)
-	    {
-	      fprintf (stderr,
-		       "stop extension whether maximality or str/end position! %lu %lu %d %d\n",
-		       q_start, t_start, q_seed_len, t_seed_len);
-	    }
-	  return;
-	}
-    }
 #undef Q
 #undef T
 
-
-  // WE DO NOT EXTEND THE MAXIMAL SEEDS IF there is a seed threshold
-  // INSTEAD WE EXTEND THE MOST FAVOURABLE SUBSEED WITHIN MAXIMAL SEED
-  if (seed_threshold_flag)
-    {
-      seed_len = best_seed_len;
-      q_seed_len = best_seed_len;
-      t_seed_len = best_seed_len;
-      q_start += best_spos;
-      t_start += best_spos;
-      total_score = best_seed_score;
-    }
-
-  //Remaining sequence length definition has to change here since we are going to decide DP boundaries
-  /* find boundaries for DP (remaining seq left/right of the seed)
-   * all rem_{query,target}_len_{left,right} are + 1
-   * i.e. nnnNNNNNnnnnn (with N for seed location) yields rem..left=4, rem..right=6
-   * find value for query by actual boundaries (limited by max_ext_len)
-   * for target its also limited by max_ext_len, possibly corrected by sequence boundaries
-   */
-  rem_query_len_left = min (max_ext_len, q_start + 1);
-  rem_target_len_left = min (max_ext_len, t_start - sum_l[idx] + 1);
-  rem_query_len_right =
-    min (max_ext_len, query_len - q_seed_len - q_start + 1);
-  rem_target_len_right =
-    min (max_ext_len, sum_l[idx + 1] - (t_start + t_seed_len - 1));
-
-  if (print_debug)
-    {
-      fprintf (stderr, "seed_score = seed_score : %d\n", total_score);
-    }
-
-  total_score +=
-    DP_left (M_left, Bq_left, Bt_left, rem_query_len_left,
-	     rem_target_len_left, qsa, sa, q_start, t_start, &best_left_i,
-	     &best_left_j);
-
-  if (print_debug)
-    {
-      fprintf (stderr, "extending the seed...\n");
-      fprintf (stderr, "total_score += DP_left : %d\n", total_score);
-    }
-
-  total_score +=
-    DP_right (M_right, Bq_right, Bt_right, rem_query_len_right,
-	      rem_target_len_right, qsa, sa, q_start + q_seed_len - 1,
-	      t_start + t_seed_len - 1, &best_right_i, &best_right_j);
-
-  if (print_debug)
-    {
-      fprintf (stderr, "total_score += DP_right : %d\n", total_score);
-    }
-
-  int nt_count =
-    best_left_j + best_left_i + best_right_i + best_right_j + q_seed_len +
-    t_seed_len;
-
-  if (print_debug)
-    {
-      fprintf (stderr,
-	       "extend_seed lq_left: %d lt_left: %d lq_right: %d lt_right: %d\n",
-	       rem_query_len_left, rem_target_len_left, rem_query_len_right,
-	       rem_target_len_right);
-      fprintf (stderr,
-	       "nt_count is %d, using blj %li, bli %li, bri %li, brj %li, q_seedlen: %d, t_seedlen: %d \n",
-	       nt_count, best_left_j, best_left_i, best_right_i, best_right_j,
-	       q_seed_len, t_seed_len);
-      fprintf (stderr, "**********************\n");
-    }
-
-  result->score = total_score + nt_count * extPen;
-  /*Energy correction, BE AWARE of energy correction, if one energy matrix is accepted as input there will be some option here */
-  result->energy = (result->score - 559.0f) / -100.0f;
-
-  //ENERGY THRESHOLD for the interaction
-  if (result->energy > min_energy)
-    {
-      if (print_debug)
-	{
-	  fprintf (stderr, "seed_score: %d \n", seed_score);
-	  fprintf (stderr, "energy for this int: %f, thr: %f \n",
-		   result->energy, min_energy);
+	// WE DO NOT EXTEND THE MAXIMAL SEEDS IF there is a seed threshold
+	// INSTEAD WE EXTEND THE MOST FAVOURABLE SUBSEED WITHIN MAXIMAL SEED
+	if (seed_threshold_flag) {
+		seed_len = best_seed_len;
+		q_seed_len = best_seed_len;
+		t_seed_len = best_seed_len;
+		q_start += best_spos;
+		t_start += best_spos;
+		total_score = best_seed_score;
 	}
-      return;
-    }
+	//Remaining sequence length definition has to change here since we are going to decide DP boundaries
+	/* find boundaries for DP (remaining seq left/right of the seed)
+	 * all rem_{query,target}_len_{left,right} are + 1
+	 * i.e. nnnNNNNNnnnnn (with N for seed location) yields rem..left=4, rem..right=6
+	 * find value for query by actual boundaries (limited by max_ext_len)
+	 * for target its also limited by max_ext_len, possibly corrected by sequence boundaries
+	 */
+	rem_query_len_left = min(max_ext_len, q_start + 1);
+	rem_target_len_left = min(max_ext_len, t_start - sum_l[idx] + 1);
+	rem_query_len_right = min(max_ext_len, query_len - q_seed_len - q_start + 1);
+	rem_target_len_right = min(max_ext_len, sum_l[idx + 1] - (t_start + t_seed_len - 1));
 
-  result->best_left_i = best_left_i;
-  result->best_left_j = best_left_j;
+	if (print_debug) {
+		fprintf(stderr, "seed_score = seed_score : %d\n", total_score);
+	}
 
-  result->best_right_i = best_right_i;
-  result->best_right_j = best_right_j;
+	total_score +=
+	    DP_left(M_left, Bq_left, Bt_left, rem_query_len_left, rem_target_len_left, qsa, sa, q_start, t_start, &best_left_i,
+		    &best_left_j);
 
-  //exit(1);
+	//fprintf(stderr, "%d\n", total_score);
+	if (print_debug) {
+		fprintf(stderr, "extending the seed...\n");
+		fprintf(stderr, "total_score += DP_left : %d\n", total_score);
+	}
 
+	total_score +=
+	    DP_right(M_right, Bq_right, Bt_right, rem_query_len_right, rem_target_len_right, qsa, sa, q_start + q_seed_len - 1,
+		     t_start + t_seed_len - 1, &best_right_i, &best_right_j);
 
-  {
-    if (show_alignment == 1)
-      {
-	print_alignment (sa, qsa, result, query_len, seed_len, M_left,
-			 Bq_left, Bt_left, M_right, Bq_right, Bt_right);
-      }
-    else if (show_alignment == 2)
-      {
-	print_ali2 (sa, qsa, result, query_len, seed_len, M_left, Bq_left,
-		    Bt_left, M_right, Bq_right, Bt_right);
-      }
-    else if (show_alignment == 3 || show_alignment == 4)
-      {
-	print_alignment (sa, qsa, result, query_len, seed_len, M_left,
-			 Bq_left, Bt_left, M_right, Bq_right, Bt_right);
-	print_ali2 (sa, qsa, result, query_len, seed_len, M_left, Bq_left,
-		    Bt_left, M_right, Bq_right, Bt_right);
+	if (print_debug) {
+		fprintf(stderr, "total_score += DP_right : %d\n", total_score);
+	}
 
-	/* Lets get the target & PAM sequence from target */
-	char buf[4];
-	/* Save the flanking sequences on already created temp strings */
-	char *temp_fivend_str = result->temp_target_str;
-	char *temp_thrend_str = result->temp_ia_str;
-	*temp_fivend_str = 0;
-	*temp_thrend_str = 0;
+	int nt_count = best_left_j + best_left_i + best_right_i + best_right_j + q_seed_len + t_seed_len;
 
-	saidx64_t lpos = result->new_left - sum_l[idx];
-	saidx64_t rpos = result->new_right - sum_l[idx];
-	if (idx % 2 == 1)
-	  {
-	    saidx64_t tpos = lpos;
-	    lpos = idx_lengths[idx] - rpos;
-	    rpos = idx_lengths[idx] - tpos;
-	  }
-	else
-	  {
-	    lpos += 1;
-	    rpos += 1;
-	  }
-	saidx64_t trailing_left = lpos - 1;
-	saidx64_t trailing_right = idx_lengths[idx] - rpos;
+	if (print_debug) {
+		fprintf(stderr, "extend_seed lq_left: %d lt_left: %d lq_right: %d lt_right: %d\n", rem_query_len_left,
+			rem_target_len_left, rem_query_len_right, rem_target_len_right);
+		fprintf(stderr, "nt_count is %d, using blj %li, bli %li, bri %li, brj %li, q_seedlen: %d, t_seedlen: %d \n", nt_count,
+			best_left_j, best_left_i, best_right_i, best_right_j, q_seed_len, t_seed_len);
+		fprintf(stderr, "**********************\n");
+	}
 
-	// Get the flanking 5'end sequence of target
+	result->score = total_score + nt_count * extPen;
+	/*Energy correction, BE AWARE of energy correction, if one energy matrix is accepted as input there will be some option here */
+	result->energy = (result->score - dsm_offset) / -SCALEFACTOR;
+
+	//ENERGY THRESHOLD for the interaction
+	if (result->energy > min_energy) {
+		if (print_debug) {
+			fprintf(stderr, "seed_score: %d \n", seed_score);
+			fprintf(stderr, "energy for this int: %f, thr: %f \n", result->energy, min_energy);
+		}
+		return;
+	}
+
+	result->best_left_i = best_left_i;
+	result->best_left_j = best_left_j;
+
+	result->best_right_i = best_right_i;
+	result->best_right_j = best_right_j;
+
+	//exit(1);
+
+	{
+		if (show_alignment == 1) {
+			print_alignment(sa, qsa, result, query_len, seed_len, M_left, Bq_left, Bt_left, M_right, Bq_right, Bt_right);
+		} else if (show_alignment == 2) {
+			print_ali2(sa, qsa, result, query_len, seed_len, M_left, Bq_left, Bt_left, M_right, Bq_right, Bt_right);
+		} else if (show_alignment == 3 || show_alignment == 4) {
+			print_alignment(sa, qsa, result, query_len, seed_len, M_left, Bq_left, Bt_left, M_right, Bq_right, Bt_right);
+			print_ali2(sa, qsa, result, query_len, seed_len, M_left, Bq_left, Bt_left, M_right, Bq_right, Bt_right);
+
+			/* Lets get the target & PAM sequence from target */
+			char buf[4];
+			/* Save the flanking sequences on already created temp strings */
+			char *temp_fivend_str = result->temp_target_str;
+			char *temp_thrend_str = result->temp_ia_str;
+			*temp_fivend_str = 0;
+			*temp_thrend_str = 0;
+
+			saidx64_t lpos = result->new_left - sum_l[idx];
+			saidx64_t rpos = result->new_right - sum_l[idx];
+			if (idx % 2 == 1) {
+				saidx64_t tpos = lpos;
+				lpos = idx_lengths[idx] - rpos;
+				rpos = idx_lengths[idx] - tpos;
+			} else {
+				lpos += 1;
+				rpos += 1;
+			}
+			saidx64_t trailing_left = lpos - 1;
+			saidx64_t trailing_right = idx_lengths[idx] - rpos;
+
+			// Get the flanking 5'end sequence of target
 #define TSc(ix) (scomp[XSTR(sa[result->new_right+(ix+1)])])
-	saidx64_t flank_length = 20;
+			saidx64_t flank_length = 20;
 
-	saidx64_t valid_length = min (flank_length, trailing_right);
-	if (idx % 2 == 1)
-	  valid_length = min (flank_length, trailing_left);
+			saidx64_t valid_length = min(flank_length, trailing_right);
+			if (idx % 2 == 1)
+				valid_length = min(flank_length, trailing_left);
 
-	saidx64_t i;
-	for (i = 0; i < valid_length; i = i + 1)
-	  {
-	    sprintf (buf, "%c", TSc (i));
-	    strcat (temp_fivend_str, buf);
-	  }
+			saidx64_t i;
+			for (i = 0; i < valid_length; i = i + 1) {
+				sprintf(buf, "%c", TSc(i));
+				strcat(temp_fivend_str, buf);
+			}
 #undef TSc
 
-	// Get the flanking 3'end sequence of target
+			// Get the flanking 3'end sequence of target
 #define TSc(ix) (scomp[XSTR(sa[result->new_left-(ix+1)])])
-	valid_length = min (flank_length, trailing_left);
+			valid_length = min(flank_length, trailing_left);
 
-	if (idx % 2 == 1)
-	  valid_length = min (flank_length, trailing_right);
+			if (idx % 2 == 1)
+				valid_length = min(flank_length, trailing_right);
 
-	for (i = 0; i < valid_length; i = i + 1)
-	  {
-	    sprintf (buf, "%c", TSc (i));
-	    strcat (temp_thrend_str, buf);
-	  }
+			for (i = 0; i < valid_length; i = i + 1) {
+				sprintf(buf, "%c", TSc(i));
+				strcat(temp_thrend_str, buf);
+			}
 #undef TSc
 
-      }
-    else
-      {
-	/* skip trackback, but still need to get the positions */
-	q_start = XSA (qsa[result->k]);
-	t_start = XSA (sa[result->j]);
-	result->new_left = t_start - result->best_left_j;
-	result->q_new_left = q_start - result->best_left_i;
-	t_start = t_start + t_seed_len - 1;
-	q_start = q_start + q_seed_len - 1;
-	result->new_right = t_start + result->best_right_j;
-	result->q_new_right = q_start + result->best_right_i;
+		} else if (show_alignment == 4) {
+			print_alignment(sa, qsa, result, query_len, seed_len, M_left, Bq_left, Bt_left, M_right, Bq_right, Bt_right);
+			print_ali2(sa, qsa, result, query_len, seed_len, M_left, Bq_left, Bt_left, M_right, Bq_right, Bt_right);
+		} else {
+			/* skip trackback, but still need to get the positions */
+			q_start = XSA(qsa[result->k]);
+			t_start = XSA(sa[result->j]);
+			result->new_left = t_start - result->best_left_j;
+			result->q_new_left = q_start - result->best_left_i;
+			t_start = t_start + t_seed_len - 1;
+			q_start = q_start + q_seed_len - 1;
+			result->new_right = t_start + result->best_right_j;
+			result->q_new_right = q_start + result->best_right_i;
 
-      }
-    if (all_vs_all || strcmp(qname, name[idx]) == 0) {
-	    result->found = 1;
-	    print_result (qname, sa, qsa, result);
-    }
-  }
+		}
+		if (all_vs_all || strcmp(qname, name[idx]) == 0) {
+			result->found = 1;
+			print_result(qname, sa, qsa, result);
+		}
+	}
 
+}
+
+
+void extend_seed_weighted(saidx64_t j,	//!< Index in target suffix array (where seed match was found)
+		 saidx64_t k,	//!< Index in query suffix array (where seed match was found)
+		 const saidx64_t * sa,	//!< Suffix array of the target
+		 const saidx64_t * qsa,	//!< Suffix array of the query
+		 aln_result_t * result,	//!< result struct, fill in positions
+		 double seed_score,	//!< Score of the seed match
+		 saidx64_t query_len,	//!< Length of the query, target length is in sum_l table
+		 int seed_len,	//!< Length of the seed
+		 saidx64_t best_spos,	//!< Start pos. of the most energy favourable subseed within any seed
+		 int best_seed_len,	//!< Length of the most energy favourable subseed
+		 double best_seed_score,	//!< Score of the most energy favourable subseed
+		 char *qname,	//!< Name of the query sequence
+		 int *seed,	//!< normalized (query-specific) seed info (m:n/l)
+		 float *M_left,	//!< DP matrix for left extension, match state
+		 float *Bq_left,	//!< DP matrix for left extension, query bulged state
+		 float *Bt_left,	//!< DP matrix for left extension, target bulged state
+		 int *M_right,	//!< DP matrix for right extension, match state
+		 int *Bq_right,	//!< DP matrix for right extension, query bulged state
+		 int *Bt_right)	//!< DP matrix for right extension, target bulged state
+{
+	int q_seed_len = seed_len, t_seed_len = seed_len;
+	double total_score = seed_score;
+	saidx64_t best_left_i = 0, best_left_j = 0, best_right_i = 0, best_right_j = 0;
+
+	result->found = 0;
+
+	// get 0-based suffix numbers for query and target, and get seq id of the target region
+	saidx64_t q_start = XSA(qsa[k]);
+	saidx64_t t_start = XSA(sa[j]);
+	saidx64_t idx = XIDX(sa[j]);
+
+	//* get remaining lengths for left and right maximality check (min=0)
+	int rem_query_len_left = q_start;
+	int rem_target_len_left = t_start - sum_l[idx];
+	int rem_query_len_right = query_len - (q_seed_len + q_start);
+	int rem_target_len_right = sum_l[idx + 1] - (t_start + t_seed_len);
+
+	if (print_debug)
+		fprintf(stderr, "analyzing q_seed:%lu-%lu, t_start: %lu \n ", q_start + 1, q_start + q_seed_len, t_start);
+
+#define Q(ix) (XRIS(qsa[q_start+(ix)]))
+#define T(ix) (comp[XRIS(sa[t_start+(ix)])])
+	// test whether seed is flanked on left or right by a valid base pair
+	// Maximal Test is different when seed is limited to some region
+	// in that case, left maximality is important only if seed starts in mid positions. seed_flag determines if there is a positional constraint
+	if (noGUseed) {
+		if (seed_flag) {
+			if (q_start + 1 < seed[0] || q_start + q_seed_len > seed[1]) {
+				if (print_debug) {
+					fprintf(stderr,
+						"extension stopped due to start/end position for q_seed:%lu-%lu,  rem_query_len_left: %d, rem_query_len_right: %d, rem_target_len_left: %d, rem_target_len_right: %d \n",
+						q_start + 1, q_start + q_seed_len, rem_query_len_left, rem_query_len_right,
+						rem_target_len_left, rem_target_len_right);
+				}
+				// extension stops due to start or end position
+				return;
+			}
+
+			if ((rem_query_len_left - (seed[0] - 1) > 0 && rem_target_len_left > 0 && pair_noGU[Q(-1)][T(-1)])
+			    || (rem_query_len_right - (query_len - seed[1]) > 0 && rem_target_len_right > 0
+				&& pair_noGU[Q(q_seed_len)][T(t_seed_len)])) {
+				if (print_debug) {
+					fprintf(stderr,
+						"extension stopped due to maximality for q_seed:%lu-%lu,  rem_query_len_left: %d, rem_query_len_right: %d, rem_target_len_left: %d, rem_target_len_right: %d \n",
+						q_start + 1, q_start + q_seed_len, rem_query_len_left, rem_query_len_right,
+						rem_target_len_left, rem_target_len_right);
+				}
+				// extension stops due to maximality within the seed
+				return;
+			}
+		} else if ((rem_query_len_left > 0 && rem_target_len_left > 0 && pair_noGU[Q(-1)][T(-1)])
+			   || (rem_query_len_right > 0 && rem_target_len_right > 0 && pair_noGU[Q(q_seed_len)][T(t_seed_len)])) {
+			if (print_debug) {
+				fprintf(stderr, "stop extension whether maximality or str/end position! %lu %lu %d %d\n", q_start,
+					t_start, q_seed_len, t_seed_len);
+			}
+			return;
+		}
+	} else {
+		if (seed_flag) {
+			if (q_start + 1 < seed[0] || q_start + q_seed_len > seed[1]) {
+				if (print_debug) {
+					fprintf(stderr,
+						"extension stopped due to start/end position for q_seed:%lu-%lu,  rem_query_len_left: %d, rem_query_len_right: %d, rem_target_len_left: %d, rem_target_len_right: %d \n",
+						q_start + 1, q_start + q_seed_len, rem_query_len_left, rem_query_len_right,
+						rem_target_len_left, rem_target_len_right);
+				}
+				// extension stops due to start or end position
+				return;
+			}
+
+			if ((rem_query_len_left - (seed[0] - 1) > 0 && rem_target_len_left > 0 && pair[Q(-1)][T(-1)])
+			    || (rem_query_len_right - (query_len - seed[1]) > 0 && rem_target_len_right > 0
+				&& pair[Q(q_seed_len)][T(t_seed_len)])) {
+				if (print_debug) {
+					fprintf(stderr,
+						"extension stopped due to maximality for q_seed:%lu-%lu,  rem_query_len_left: %d, rem_query_len_right: %d, rem_target_len_left: %d, rem_target_len_right: %d \n",
+						q_start + 1, q_start + q_seed_len, rem_query_len_left, rem_query_len_right,
+						rem_target_len_left, rem_target_len_right);
+				}
+				// extension stops due to maximality within the seed
+				return;
+			}
+		} else if ((rem_query_len_left > 0 && rem_target_len_left > 0 && pair[Q(-1)][T(-1)])
+			   || (rem_query_len_right > 0 && rem_target_len_right > 0 && pair[Q(q_seed_len)][T(t_seed_len)])) {
+			if (print_debug) {
+				fprintf(stderr, "stop extension whether maximality or str/end position! %lu %lu %d %d\n", q_start,
+					t_start, q_seed_len, t_seed_len);
+			}
+			return;
+		}
+	}
+#undef Q
+#undef T
+
+	// WE DO NOT EXTEND THE MAXIMAL SEEDS IF there is a seed threshold
+	// INSTEAD WE EXTEND THE MOST FAVOURABLE SUBSEED WITHIN MAXIMAL SEED
+	if (seed_threshold_flag) {
+		seed_len = best_seed_len;
+		q_seed_len = best_seed_len;
+		t_seed_len = best_seed_len;
+		q_start += best_spos;
+		t_start += best_spos;
+		total_score = best_seed_score;
+	}
+	//Remaining sequence length definition has to change here since we are going to decide DP boundaries
+	/* find boundaries for DP (remaining seq left/right of the seed)
+	 * all rem_{query,target}_len_{left,right} are + 1
+	 * i.e. nnnNNNNNnnnnn (with N for seed location) yields rem..left=4, rem..right=6
+	 * find value for query by actual boundaries (limited by max_ext_len)
+	 * for target its also limited by max_ext_len, possibly corrected by sequence boundaries
+	 */
+	rem_query_len_left = min(max_ext_len, q_start + 1);
+	rem_target_len_left = min(max_ext_len, t_start - sum_l[idx] + 1);
+	rem_query_len_right = min(max_ext_len, query_len - q_seed_len - q_start + 1);
+	rem_target_len_right = min(max_ext_len, sum_l[idx + 1] - (t_start + t_seed_len - 1));
+
+	if (print_debug) {
+		fprintf(stderr, "seed_score = seed_score : %f\n", total_score);
+	}
+
+	total_score +=
+	    DP_left_weighted(M_left, Bq_left, Bt_left, rem_query_len_left, rem_target_len_left, query_len, weights, qsa, sa, q_start,
+			     t_start, &best_left_i, &best_left_j);
+
+	//fprintf(stderr, "%f\n", total_score);
+	if (print_debug) {
+		fprintf(stderr, "extending the seed...\n");
+		fprintf(stderr, "total_score += DP_left : %f\n", total_score);
+	}
+
+	total_score +=
+	    DP_right(M_right, Bq_right, Bt_right, rem_query_len_right, rem_target_len_right, qsa, sa, q_start + q_seed_len - 1,
+		     t_start + t_seed_len - 1, &best_right_i, &best_right_j);
+
+	if (print_debug) {
+		fprintf(stderr, "total_score += DP_right : %f\n", total_score);
+	}
+
+	int nt_count = best_left_j + best_left_i + best_right_i + best_right_j + q_seed_len + t_seed_len;
+
+	if (print_debug) {
+		fprintf(stderr, "extend_seed lq_left: %d lt_left: %d lq_right: %d lt_right: %d\n", rem_query_len_left,
+			rem_target_len_left, rem_query_len_right, rem_target_len_right);
+		fprintf(stderr, "nt_count is %d, using blj %li, bli %li, bri %li, brj %li, q_seedlen: %d, t_seedlen: %d \n", nt_count,
+			best_left_j, best_left_i, best_right_i, best_right_j, q_seed_len, t_seed_len);
+		fprintf(stderr, "**********************\n");
+	}
+
+	result->score = total_score + nt_count * extPen;
+	/*Energy correction, BE AWARE of energy correction, if one energy matrix is accepted as input there will be some option here */
+	result->energy = (result->score - dsm_offset) / -SCALEFACTOR;
+
+	//ENERGY THRESHOLD for the interaction
+	if (result->energy > min_energy) {
+		if (print_debug) {
+			fprintf(stderr, "seed_score: %f \n", seed_score);
+			fprintf(stderr, "energy for this int: %f, thr: %f \n", result->energy, min_energy);
+		}
+		return;
+	}
+
+	result->best_left_i = best_left_i;
+	result->best_left_j = best_left_j;
+
+	result->best_right_i = best_right_i;
+	result->best_right_j = best_right_j;
+
+	//exit(1);
+
+	{
+		if (show_alignment == 1) {
+			print_alignment_weighted(sa, qsa, result, query_len, seed_len, rem_query_len_left, M_left, Bq_left, Bt_left,
+						 M_right, Bq_right, Bt_right, weights);
+		} else if (show_alignment == 2) {
+			print_ali2_weighted(sa, qsa, result, query_len, seed_len, rem_query_len_left, M_left, Bq_left, Bt_left,
+					    M_right, Bq_right, Bt_right, weights);
+		} else if (show_alignment == 3 || show_alignment == 6) {
+			print_alignment_weighted(sa, qsa, result, query_len, seed_len, rem_query_len_left, M_left, Bq_left, Bt_left,
+						 M_right, Bq_right, Bt_right, weights);
+			print_ali2_weighted(sa, qsa, result, query_len, seed_len, rem_query_len_left, M_left, Bq_left, Bt_left,
+					    M_right, Bq_right, Bt_right, weights);
+			/* Lets get the target & PAM sequence from target */
+			char buf[4];
+			/* Save the flanking sequences on already created temp strings */
+			char *temp_fivend_str = result->temp_target_str;
+			char *temp_thrend_str = result->temp_ia_str;
+			*temp_fivend_str = 0;
+			*temp_thrend_str = 0;
+
+			saidx64_t lpos = result->new_left - sum_l[idx];
+			saidx64_t rpos = result->new_right - sum_l[idx];
+			if (idx % 2 == 1) {
+				saidx64_t tpos = lpos;
+				lpos = idx_lengths[idx] - rpos;
+				rpos = idx_lengths[idx] - tpos;
+			} else {
+				lpos += 1;
+				rpos += 1;
+			}
+			saidx64_t trailing_left = lpos - 1;
+			saidx64_t trailing_right = idx_lengths[idx] - rpos;
+
+			// Get the flanking 5'end sequence of target
+#define TSc(ix) (scomp[XSTR(sa[result->new_right+(ix+1)])])
+			saidx64_t flank_length = 20;
+
+			saidx64_t valid_length = min(flank_length, trailing_right);
+			if (idx % 2 == 1)
+				valid_length = min(flank_length, trailing_left);
+
+			saidx64_t i;
+			for (i = 0; i < valid_length; i = i + 1) {
+				sprintf(buf, "%c", TSc(i));
+				strcat(temp_fivend_str, buf);
+			}
+#undef TSc
+
+			// Get the flanking 3'end sequence of target
+#define TSc(ix) (scomp[XSTR(sa[result->new_left-(ix+1)])])
+			valid_length = min(flank_length, trailing_left);
+
+			if (idx % 2 == 1)
+				valid_length = min(flank_length, trailing_right);
+
+			for (i = 0; i < valid_length; i = i + 1) {
+				sprintf(buf, "%c", TSc(i));
+				strcat(temp_thrend_str, buf);
+			}
+#undef TSc
+
+		} else if (show_alignment == 4) {
+			print_alignment_weighted(sa, qsa, result, query_len, seed_len, rem_query_len_left, M_left, Bq_left, Bt_left,
+						 M_right, Bq_right, Bt_right, weights);
+			print_ali2_weighted(sa, qsa, result, query_len, seed_len, rem_query_len_left, M_left, Bq_left, Bt_left,
+					    M_right, Bq_right, Bt_right, weights);
+		} else {
+			/* skip trackback, but still need to get the positions */
+			q_start = XSA(qsa[result->k]);
+			t_start = XSA(sa[result->j]);
+			result->new_left = t_start - result->best_left_j;
+			result->q_new_left = q_start - result->best_left_i;
+			t_start = t_start + t_seed_len - 1;
+			q_start = q_start + q_seed_len - 1;
+			result->new_right = t_start + result->best_right_j;
+			result->q_new_right = q_start + result->best_right_i;
+
+		}
+		if (all_vs_all || strcmp(qname, name[idx]) == 0) {
+			result->found = 1;
+			print_result(qname, sa, qsa, result);
+		}
+	}
 }
 
 
@@ -2271,6 +3548,253 @@ sa_evaluate_interval (sa_interval_list_t * results, query_t * query,
   free (result->result_str);
   free (result->result_short);
   free (result);
+}
+
+void sa_evaluate_interval_weighted(sa_interval_list_t * results, query_t * query, const saidx64_t * sa, char strand)
+{
+	sa_interval_list_t *p;
+	int seed_len;
+	double seed_score;
+	saidx64_t ql, qr, sl, sr, j, k;
+	saidx64_t q_start, t_start, xsa, idx;
+	saidx64_t *qsa = query->qsa;
+	int query_len = query->length;
+	int dp_size, str_size;
+
+	//For finding best subseed and seed energy filtering
+	saidx64_t min_seed_length = query->seed[2], best_subseed_spos;;
+	double best_perlength_score, temp_perlength_score;
+	double temp_subseed_score, best_subseed_score;
+	int temp_subseed_len, best_subseed_len;
+
+#ifdef DEBUG
+	print_debug = 1;
+#endif
+
+#if VERBOSE>1
+	print_mats_l = 1;
+	print_mats_r = 1;
+#endif
+
+	if (max_ext_len > 0) {
+		dp_size = (max_ext_len + 1) * (max_ext_len + 1);
+		str_size = 4 * max_ext_len + query_len;	//should be enough to allow for x gaps on x nts extension
+	} else {
+		dp_size = (query_len) * (query_len);
+		str_size = 2 * (query_len);
+	}
+
+	// the length of the dp matrix will be the length of the extension window
+	// tables for DP to the left and right of the seed region
+	float *M_left = (float *)calloc(dp_size, sizeof(float));
+	float *Bq_left = (float *)calloc(dp_size, sizeof(float));
+	float *Bt_left = (float *)calloc(dp_size, sizeof(float));
+
+	int *M_right = (int *)calloc(dp_size, sizeof(int));
+	int *Bq_right = (int *)calloc(dp_size, sizeof(int));
+	int *Bt_right = (int *)calloc(dp_size, sizeof(int));
+
+	if (!M_left || !Bq_left || !Bt_left || !M_right || !Bq_right || !Bt_right) {
+		fprintf(stderr, "Failed allocating DP matrices\n");
+		exit(EXIT_FAILURE);
+	}
+	//print_dsm_table();
+	aln_result_t *result = (aln_result_t *) calloc(1, sizeof(aln_result_t));
+	if (!result) {
+		fprintf(stderr, "Failed allocating result struct\n");
+		exit(EXIT_FAILURE);
+	}
+	if (show_alignment == 1) {
+		result->query_str = calloc(str_size, sizeof(char));
+		result->temp_query_str = calloc(str_size, sizeof(char));
+		result->aln_str = calloc(str_size, sizeof(char));
+		result->temp_aln_str = calloc(str_size, sizeof(char));
+		result->target_str = calloc(str_size, sizeof(char));
+		result->temp_target_str = calloc(str_size, sizeof(char));
+		if (!result->query_str || !result->temp_query_str || !result->aln_str || !result->temp_aln_str || !result->target_str
+		    || !result->temp_target_str) {
+			fprintf(stderr, "Failed allocating result attributes\n");
+			exit(EXIT_FAILURE);
+		}
+	} else if (show_alignment == 2) {
+		result->ia_str = calloc(str_size, sizeof(char));
+		result->temp_ia_str = calloc(str_size, sizeof(char));
+		if (!result->ia_str || !result->temp_ia_str) {
+			fprintf(stderr, "Failed allocating result attributes\n");
+			exit(EXIT_FAILURE);
+		}
+	} else if (show_alignment == 3 || show_alignment == 4 || show_alignment == 5 || show_alignment == 6) {
+		result->query_str = calloc(str_size, sizeof(char));
+		result->temp_query_str = calloc(str_size, sizeof(char));
+		result->aln_str = calloc(str_size, sizeof(char));
+		result->temp_aln_str = calloc(str_size, sizeof(char));
+		result->target_str = calloc(str_size, sizeof(char));
+		result->temp_target_str = calloc(str_size, sizeof(char));
+		result->ia_str = calloc(str_size, sizeof(char));
+		result->temp_ia_str = calloc(str_size, sizeof(char));
+		if (!result->query_str || !result->temp_query_str || !result->aln_str || !result->temp_aln_str || !result->target_str
+		    || !result->temp_target_str || !result->ia_str || !result->temp_ia_str) {
+			fprintf(stderr, "Failed allocating result attributes\n");
+			exit(EXIT_FAILURE);
+		}
+	}
+	result->result_str = calloc(1024, sizeof(char));
+	if (!result->result_str) {
+		fprintf(stderr, "Failed allocating result string\n");
+		exit(EXIT_FAILURE);
+	}
+
+
+	for (p = results; p; p = p->next) {
+		result->seed_count = 0;
+		// the locations that match in the index
+		sl = p->start;
+		sr = p->end;
+
+		// the locations that match in the query
+		ql = p->qstart;
+		qr = p->qend;
+
+		seed_len = p->slen;
+		seed_score = 0.0;
+
+		q_start = XSA(qsa[ql]);
+		t_start = XSA(sa[sl]);
+
+		idx = XIDX(sa[sl]);
+		//#define Q(ix) (comp[XRIS(qsa[q_start+(ix)])])
+#define Q(ix) (XRIS(qsa[q_start+(ix)]))
+		//#define T(ix) (XRIS(sa[t_start+(ix)]))
+#define T(ix) (comp[XRIS(sa[t_start+(ix)])])
+//#define QS(ix) (XSTR(qsa[q_start+(ix)]))
+//#define TS(ix) (XSTR(sa[t_start+(ix)]))
+//#define TSc(ix) (scomp[TS(ix)])
+		//fprintf(stderr, "orig q_start: %lu t_start: %lu\n", q_start, t_start);
+
+		for (j = 0; j < seed_len - 1; j++) {
+		    //the seed is evaluated from left to right. Weights are also used left-right.
+            seed_score += (*S)[Q(j)][Q(j + 1)][T(j)][T(j + 1)] * weights[seed_len-1-j-1]; //seed_len -1 is the num of weights. J-1 is the offset for the weights array.
+            //printf("Weight=%f\n",weights[seed_len-1-j-1]);
+		}
+
+		//Minimum energy per length threshold for seeds
+		best_perlength_score = (double)seed_score / seed_len;
+		best_subseed_len = seed_len;
+		best_subseed_score = seed_score;
+		best_subseed_spos = 0;
+		if (seed_threshold_flag) {
+			double threshold = min_seed_energy_per_length * (-100);
+			int hold_score;
+			temp_subseed_score = seed_score;
+			for (j = seed_len - 1; j >= (min_seed_length - 1); j--) {
+				hold_score = temp_subseed_score;
+				for (k = 0; k <= (j - (min_seed_length - 1)); k++) {
+					temp_subseed_len = (j - k) + 1;
+					temp_perlength_score = (double)temp_subseed_score / temp_subseed_len;
+					if (temp_perlength_score > best_perlength_score) {
+						best_perlength_score = temp_perlength_score;
+						best_subseed_len = temp_subseed_len;
+						best_subseed_score = temp_subseed_score;
+						best_subseed_spos = k;
+					}
+                    temp_subseed_score -= (*S)[Q(k)][Q(k + 1)][T(k)][T(k + 1)] * weights[seed_len-1-k-1]; //seed is evaluated from left to right. seed_len -1 is the num of weights. k-1 is the offset for the weights array.
+				}
+				temp_subseed_score = hold_score - (*S)[Q(j - 1)][Q(j)][T(j - 1)][T(j)] * weights[seed_len-1-j]; //the seed is shortened from right to left, with j indexing from last nt in seed to first.
+			}
+			if (best_perlength_score < threshold) {
+				continue;
+			}
+		}
+#undef Q
+#undef T
+		//printf("\n sl = %d   seed_len = %d \n ", sl, seed_len);
+
+		for (j = sl; j < sr; j++) {
+			xsa = XSA(sa[j]);	// = t_start
+			idx = XIDX(sa[j]);
+
+			if (xsa + seed_len > sum_l[idx + 1]) {
+				//fprintf(stderr, "seed match extends into next sequence, aborting\n");
+				//Since all valid seeds, whether maximal or not, are feeded into this stage
+				//Ignoring seeds that extends into next sequence is not a problem
+				continue;
+			}
+
+			for (k = ql; k < qr; k++) {
+				result->j = j;
+				result->k = k;
+				//debug("\n seed len = %d, query len = %d, seed score = %d , t_start = %d, q_start = %d \n", seed_len, query_len, seed_score, XSA(sa[j]), XSA(qsa[k]));
+				if (print_debug) {
+					fprintf(stderr, "\nseed len = %d, query len = %d, seed score = %f , t_start = %lu, q_start = %lu \n",
+						seed_len, query_len, seed_score, XSA(sa[j]), XSA(qsa[k]));
+					fprintf(stderr, "extend seed: %d \n", seed_len);
+				}
+				//Extend the current seed, (subseed info is given seperately)
+				extend_seed_weighted(j, k, sa, qsa, result, seed_score, query->length, seed_len, best_subseed_spos, best_subseed_len,
+					    best_subseed_score, query->name, query->seed, M_left, Bq_left, Bt_left, M_right, Bq_right, Bt_right);
+
+//#pragma omp critical
+//NOT critical as now all write to own file! reduces overhead that is spent waiting?
+				{
+					if (result->found) {
+						// Do not print seeds/extends for showalignment==4, just count valid ones
+						if (show_alignment == 4) {
+							result->seed_count = result->seed_count + 1;
+							if (result->seed_count == 1)
+								really_print_alignment(query->out, result);
+						} else
+							really_print_alignment(query->out, result);
+					}
+				}
+			}
+		}
+
+		// print the seed only for show alignment 4
+		if (show_alignment == 4 && result->seed_count > 0)
+			gzprintf(query->out, "\t%d\n", result->seed_count);
+	}
+
+	/*
+	   printf("\nCounts of seeds of each seed length:\n");
+
+	   for (i = 0; i < query_len; i++){
+	   if (seed_lengths[i] != 0)
+	   printf("seed_len[%d]=%lu \n", i, seed_lengths[i]);
+	   }
+	   printf("\n");
+
+	   free(seed_lengths);
+	 */
+
+	free(M_right);
+	free(Bq_right);
+	free(Bt_right);
+
+	free(M_left);
+	free(Bq_left);
+	free(Bt_left);
+	if (show_alignment == 1) {
+		free(result->query_str);
+		free(result->temp_query_str);
+		free(result->aln_str);
+		free(result->temp_aln_str);
+		free(result->target_str);
+		free(result->temp_target_str);
+	} else if (show_alignment == 2) {
+		free(result->ia_str);
+		free(result->temp_ia_str);
+	} else if (show_alignment == 3 || show_alignment == 4 || show_alignment == 5 || show_alignment == 6) {
+		free(result->query_str);
+		free(result->temp_query_str);
+		free(result->aln_str);
+		free(result->temp_aln_str);
+		free(result->target_str);
+		free(result->temp_target_str);
+		free(result->ia_str);
+		free(result->temp_ia_str);
+	}
+	free(result->result_str);
+	free(result);
 }
 
 /** @brief parallel suffix array matching on sense-strand

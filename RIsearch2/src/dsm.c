@@ -32,17 +32,20 @@
 /*equals dsm for extpen=0 */
 /* based on Turner 1999 parameters. */
 /* Compared to RIsearch1.1, here ending with a bulge has the same cost as continuing a bulge.*/
-/* ../tables/risearch2/dsm_t99.1.1.tsv */
-/* ../tables/risearch2/dsm_t99.1.2.tsv */
-/* based on Turner 2004 parameters Compared to RIsearch1.1, here ending with a
- * bulge has the same cost as continuing a bulge */
 /* ../tables/risearch2/dsm_t04.1.1.tsv */
 /* ../tables/risearch2/dsm_t04.1.2.tsv */
+
+
+/* based on Turner 2004 parameters Compared to RIsearch1.1, here ending with a
+ * bulge has the same cost as continuing a bulge 
+ * ../tables/risearch2/dsm_t99.1.1.tsv 
+ * ../tables/risearch2/dsm_t99.1.2.tsv */
 
 /* DNA_DNA matrix based on Santa Lucia and Hicks 2004 parameters. G-T wobble is
  * not allowed Matrix converted to RIsearch1 format from RIsearch2.1. Compared
  * to RIsearch2.1, here ending with a bulge has the same cost as continuing a
  * bulge.*/
+
 /* ../tables/risearch2/dsm_slh04_noGU.1.1.tsv */
 /* ../tables/risearch2/dsm_slh04_noGU.1.2.tsv */
 
@@ -51,6 +54,7 @@
  * parameters. G-U wobble is allowed. Matrix converted to RIsearch1 format from
  * RIsearch2.1. Compared to RIsearch2.1, here ending with a bulge has the same
  * cost as continuing a bulge. */
+
 /* ../tables/risearch2/dsm_su95_rev_wGU.1.1.tsv 
  * ../tables/risearch2/dsm_su95_rev_wGU.1.2.tsv */
 
