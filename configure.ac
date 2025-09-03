@@ -1,4 +1,4 @@
-AC_INIT([RIsearchUnified], [1.0], [you@example.com])
+AC_INIT([RIsearch], [2.4], [software@rth.dk])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
 AC_PROG_CC
 AC_ARG_WITH([matpath],

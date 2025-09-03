@@ -12,7 +12,3 @@ RIsearch_dbg_LDADD = -lm
 
 CLEANFILES = RIsearch RIsearch_dbg
 
-# Install binaries to bin directory
-install-exec-hook:
-	mkdir -p $(DESTDIR)/bin
-	cp RIsearch RIsearch_dbg $(DESTDIR)/bin

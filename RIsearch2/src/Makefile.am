@@ -14,9 +14,5 @@ risearch2_dbg_CPPFLAGS = $(risearch2_CPPFLAGS) -DDEBUG -DVERBOSE=2
 risearch2_dbg_CFLAGS = $(risearch2_CFLAGS) -ggdb -g3 -O0 -Wall
 risearch2_dbg_LDADD = $(risearch2_LDADD)
 
-CLEANFILES = risearch2 risearch2_dbg
 
-# Install binaries to bin directory
-install-exec-hook:
-	mkdir -p $(DESTDIR)/bin
-	cp risearch2 risearch2_dbg $(DESTDIR)/bin
+CLEANFILES = risearch2 risearch2_dbg
