@@ -5,5 +5,5 @@ AC_PROG_CC
 AC_PROG_CC
 AC_OPENMP
 AC_CONFIG_HEADERS([config.h])
-AC_CONFIG_FILES([Makefile RIsearch1/src/Makefile RIsearch2/src/Makefile])
+AC_CONFIG_FILES([Makefile src/Makefile])
 AC_OUTPUT

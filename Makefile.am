@@ -1,4 +1,4 @@
-SUBDIRS = RIsearch1/src RIsearch2/src
+SUBDIRS = src
 EXTRA_DIST = README tables
 install-data-hook:
 	@mkdir -p $(DESTDIR)$(pkgdatadir)/tables

@@ -14,8 +14,10 @@ stamp-h?
 
 *.o
 *~
+build/
+bin/
 
-RIsearch1/src/RIsearch
-RIsearch1/src/RIsearch_dbg
-RIsearch2/src/risearch2
-RIsearch2/src/risearch2_dbg
+src/RIsearch
+src/RIsearch_dbg
+src/risearch2
+src/risearch2_dbg
