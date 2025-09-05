@@ -62,6 +62,7 @@
 /* ../tables/risearch2/dsm_su95_rev_noGU.1.2.tsv */
 /* ../tables/risearch2/dsm_su95_rev_noGU.1.1.tsv */
 
+char Qt_path[5][10] = {"RNA/RNA", "DNA/DNA", "RNA/DNA", "DNA/RNA", ""};
 int dsm_offset;
 dsm_t dsm_T;
 /*#nt added, to be multiplied by extpen */
@@ -198,7 +199,7 @@ static int load_mat_tsv(dsmf_t newmat, float *offset, const char *fn, int versio
 
 #define TO_T(E1,E2,T) round(SCALEFACTOR*((T[0]-T[2])/(T[1]-T[2])*(E1 - E2)+E2))
 
-static void scale_to_T(dsmf_t dsmf_1, dsmf_t dsmf_2, float *T)
+static void scale_to_T(dsmf_t dsmf_1, dsmf_t dsmf_2, const float *T)
 {
 	int i0, i1, i2, i3;
 	if (abs(T[1] - T[2]) < 0.001) {
@@ -221,7 +222,7 @@ static void scale_to_T(dsmf_t dsmf_1, dsmf_t dsmf_2, float *T)
 	}
 }
 
-void load_mats(const char *matpath, const char *matname, const char *matname2, float *T, int matversion)
+void load_mats(const char *matpath, Qt_type qt_type, const char *matname1, const char *matname2, const float *T, int matversion)
 {
 	float offset_1;
 	float offset_2;
@@ -229,31 +230,58 @@ void load_mats(const char *matpath, const char *matname, const char *matname2, f
 	dsmf_t dsmf_2;		/*  -deltaG table at  0 deg kelvin, that is deltaH */
 	char *mat1name = NULL, *mat2name = NULL;
 
-	int N1 = strlen(matpath) + strlen(matname) + 10;
-	mat1name = (char *)malloc(N1 * sizeof(char));
-	sprintf(mat1name, "%s/%s.tsv", matpath, matname);
+	fprintf(stderr, "matname1='%s', matname2='%s'\n", matname1, matname2);
+	fprintf(stderr, "T0='%.2f', T1='%.2f', T2='%.2f'\n", T[0], T[1], T[2]);
 
-	if (matname2 == NULL) {
-		mat2name = (char *)malloc(N1 * sizeof(char));
-		sprintf(mat2name, "%s/%s.2.tsv", matpath, matname);
-	} else {
-		int N2 = strlen(matpath) + strlen(matname2) + 10;
-		mat2name = (char *)malloc(N2 * sizeof(char));
-		sprintf(mat2name, "%s/%s.tsv", matpath, matname2);
+	int N1 = strlen(matpath) + strlen(matname1) + 20;
+	mat1name = (char *)malloc(N1 * sizeof(char));
+
+	sprintf(mat1name, "%s/%s/%.2f/%s.tsv", matpath, Qt_path[qt_type], T[0], matname1);
+	if (access(mat1name, R_OK) != 0) {
+		fprintf(stderr, "0 %s not found or not readable\n", mat1name);
+		sprintf(mat1name, "%s/%s/%.2f/%s.tsv", matpath, Qt_path[qt_type], T[1], matname1);
 	}
 	if (access(mat1name, R_OK) != 0) {
-		fprintf(stderr, "%s not found or not readable\n", mat1name);
+		fprintf(stderr, "1 %s not found or not readable\n", mat1name);
+		sprintf(mat1name, "%s/%s/%s.tsv", matpath, Qt_path[qt_type], matname1);
+	}
+	if (access(mat1name, R_OK) != 0) {
+		fprintf(stderr, "2 %s not found or not readable\n", mat1name);
+		sprintf(mat1name, "%s/%s.tsv", matpath, matname1);
+	}
+	if (access(mat1name, R_OK) != 0) {
+		fprintf(stderr, "3 %s not found or not readable, giving up\n", mat1name);
 		exit(1);
 	}
+
+	if (matname2 == NULL) {
+		matname2 = matname1;
+	}
+	int N2 = strlen(matpath) + strlen(matname2) + 20;
+	mat2name = (char *)malloc(N2 * sizeof(char));
+
+	sprintf(mat2name, "%s/%s/%.2f/%s.tsv", matpath, Qt_path[qt_type], T[0], matname2);
 	if (access(mat2name, R_OK) != 0) {
-		fprintf(stderr, "%s not found or not readable\n", mat2name);
-		mat2name = mat1name;
+		fprintf(stderr, "0 %s not found or not readable\n", mat2name);
+		sprintf(mat2name, "%s/%s/%.2f/%s.tsv", matpath, Qt_path[qt_type], T[2], matname2);
+	}
+	if (access(mat2name, R_OK) != 0) {
+		fprintf(stderr, "1 %s not found or not readable\n", mat2name);
+		sprintf(mat2name, "%s/%s/%s.tsv", matpath, Qt_path[qt_type], matname2);
+	}
+	if (access(mat2name, R_OK) != 0) {
+		fprintf(stderr, "2 %s not found or not readable\n", mat2name);
+		sprintf(mat2name, "%s/%s.tsv", matpath, matname2);
+	}
+	if (access(mat2name, R_OK) != 0) {
+		fprintf(stderr, "3 %s not found or not readable, giving up\n", mat2name);
+		exit(1);
 	}
 
 	if (strcmp(mat2name, mat1name) == 0) {
-		fprintf(stderr, "Temperature ignored, using %s directly.\n", mat1name);
+		fprintf(stderr, "Using %s directly.\n", mat1name);
 	} else {
-		fprintf(stderr, "Temperature Scaling of T=%.3f, using T1=%.3f with %s and T2=%.3f with %s\n", T[0], T[1], mat1name, T[2], mat2name);
+		fprintf(stderr, "Temperature Scaling of T=%.3f, using T1=%.2f with %s and T2=%.2f with %s\n", T[0], T[1], mat1name, T[2], mat2name);
 	}
 
 	if (load_mat_tsv(dsmf_1, &offset_1, mat1name, matversion) != 0) {
@@ -286,25 +314,19 @@ void check_mat_settings(const char *matname, const char *matname2, float *T)
 			exit(1);
 		}
 	}
-	if (matname2 == NULL) {
-		if (abs(T[1] - TEMPERATURE1) > 0.001 || abs(T[2] - TEMPERATURE2) > 0.001) {
-			fprintf(stderr, "Non standard tempatures given, needs --matrix2 parameter\n");
-			exit(1);
-		}
-	}
 }
 
 /** @brief Initializes RIsearch energy scoring matrix incl extension
  *  @param matname The name of the dsm matrix to use
  *  @param bA_nu The address to which the combined matrix will be written
  */
-void getMat(const char *matname, const char *matname2, const char *matpath, float *T, int *bA_nu)
+void getMat(Qt_type qt_type, const char *matname, const char *matname2, const char *matpath, float *T, int *bA_nu)
 {
 	const int *bA_bas, *bA_ext;
 	int i;
 
 	check_mat_settings(matname, matname2, T);
-	load_mats(matpath, matname, matname2, T, MATVERSION);
+	load_mats(matpath, qt_type, matname, matname2, T, MATVERSION);
 
 	bA_bas = &dsm_T[0][0][0][0];
 	bA_ext = &dsm_extend[0][0][0][0];

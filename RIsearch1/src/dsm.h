@@ -43,9 +43,19 @@
 typedef int dsm_t[DSM_N][DSM_N][DSM_N][DSM_N];
 typedef float dsmf_t[DSM_N][DSM_N][DSM_N][DSM_N];
 
+typedef enum qt_type_enum {
+	RRNA,
+	DDNA,
+	RDNA,
+	DRNA,
+	NNDNA,
+}Qt_type;
+
+extern char Qt_path[5][10]; 
+
 extern int dsm_offset;
 extern dsm_t dsm_T;
 extern dsm_t dsm_extend;
-extern void getMat(const char *matname, const char *matname2, const char *matpath, float *T, int *bA_nu);
+extern void getMat(Qt_type qt_type, const char *matname, const char *matname2, const char *matpath, float *T, int *bA_nu);
 extern int extPen;
 #endif

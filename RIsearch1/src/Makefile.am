@@ -1,7 +1,7 @@
 bin_PROGRAMS = RIsearch RIsearch_dbg
 
 RIsearch_SOURCES = dsm.c dsm.h fasta.c fasta.h main.h risearch.c weights.c
-RIsearch_CPPFLAGS = -DRISVERSION=1
+RIsearch_CPPFLAGS = -DRISVERSION=1 -DMATPATH='"$(pkgdatadir)/tables"'
 RIsearch_CFLAGS = -O3 -Wall -pedantic
 RIsearch_LDADD = -lm
 

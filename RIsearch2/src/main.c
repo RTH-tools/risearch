@@ -3,14 +3,14 @@
 
   Copyright (c) 2016 by the contributors (see AUTHORS file)
 
-  This file is part of RIsearch2.
+  This file is part of RIsearch.
 
-  RIsearch2 is free software: you can redistribute it and/or modify
+  RIsearch is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 3 of the License, or
   (at your option) any later version.
 
-  RIsearch2 is distributed in the hope that it will be useful,
+  RIsearch is distributed in the hope that it will be useful,
   but WITHOUT ANY WARRANTY; without even the implied warranty of
   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
   GNU General Public License for more details.
@@ -50,7 +50,6 @@
        __typeof__ (b) _b = (b); \
        _a > _b ? _a : _b; })
 
-const char *version = "2.1";
 extern int print_debug;
 int comp[6] = { 0, 4, 3, 2, 1, 5 };
 
@@ -109,102 +108,94 @@ float *weights;
 
 
 /* usage information */
-void usage(const char *cmd)
+void usage(const char *progname)
 {
 	fprintf(stderr, "\n");
-	fprintf(stderr, "=============================== RIsearch2 v%s ===============================\n", version);
+	fprintf(stderr, "=============================== RIsearch2 v%s ===============================\n", PACKAGE_VERSION);
 	fprintf(stderr, "================ Energy based RNA-RNA interaction predictions ================\n\n");
-	fprintf(stderr, "Usage: %s [options]\n\n", cmd);
+	fprintf(stderr, "Usage:         %s [ARGUMENTS]\n\n", progname);
 	fprintf(stderr, "  -h,         --help\n");
-	fprintf(stderr, "                 show this message\n");
+	fprintf(stderr, "     show this message\n");
 	fprintf(stderr, "--------------------------- SUFFIX ARRAY CREATION ----------------------------\n");
 	fprintf(stderr, "  -c <FILE>,  --create=FILE (.fa or .fa.gz)\n");
-	fprintf(stderr, "                 create suffix array for target sequence(s) together with\n");
-	fprintf(stderr, "                 their reverse complements, FASTA format, use '-' for stdin\n");
+	fprintf(stderr, "     create suffix array for target sequence(s) together with\n");
+	fprintf(stderr, "     their reverse complements, FASTA format, use '-' for stdin\n");
 	fprintf(stderr, "  -o <FILE>,  --output=FILE\n");
-	fprintf(stderr, "                 save created suffix array to given index file path \n");
+	fprintf(stderr, "     save created suffix array to given index file path \n");
 	fprintf(stderr, "--------------------------- INTERACTION PREDICTION ---------------------------\n");
-	fprintf(stderr, "  -q <FILE>,  --query=FILE (.fa or .fa.gz)\n");
-	fprintf(stderr, "                 FASTA file for query sequence(s), use '-' for stdin\n");
-	fprintf(stderr, "  -i <FILE>,  --index=FILE\n");
-	fprintf(stderr, "                 pregenerated suffix array file for target sequence(s)\n");
+	fprintf(stderr, "  -q <FILE>, --query=FILE (.fa or .fa.gz)\n");
+	fprintf(stderr, "     FASTA file for query sequence(s), use '-' for stdin\n");
+	fprintf(stderr, "  -i <FILE>, --index=FILE\n");
+	fprintf(stderr, "     pregenerated suffix array file for target sequence(s)\n");
 	fprintf(stderr, "-------------------------------- SEED OPTIONS --------------------------------\n");
 	fprintf(stderr, "  -s n:m/l,   --seed=n:m/l\n");
-	fprintf(stderr, "                 set seed length (-s l = length only; -s n:m = full interval;\n");
-	fprintf(stderr, "                 -s n:m/l = length in interval; default -s 6)\n");
+	fprintf(stderr, "     set seed length (-s l = length only; -s n:m = full interval;\n");
+	fprintf(stderr, "     -s n:m/l = length in interval; default -s 6)\n");
 	fprintf(stderr, "  --noGUseed     consider G-U wobble pairs as mismatch within the seed\n");
-	fprintf(stderr, "                 (only for locating seeds, energy model is not affected)\n");
+	fprintf(stderr, "     (only for locating seeds, energy model is not affected)\n");
 	fprintf(stderr, "  -m c        --mismatch=c    Mismatched seeds with max num of mismatches (c)\n");
 	fprintf(stderr, "  -m c:p      --mismatch=c:p    min consecutive matches at seed start/end (p)\n");
 	fprintf(stderr, "  -m c:ps:pe  --mismatch=c:ps:pe or ps matches at the start & pe at the end\n");
-	fprintf(stderr, "                 These seeds will not overlap with perfect complementary seeds\n");
-	fprintf(stderr, "                 (default -m 0:0 means no mismatch                          )\n");
-	fprintf(stderr, "                 (when c>0, please set p>0 to avoid overlaps, p=c at default)\n");
+	fprintf(stderr, "     These seeds will not overlap with perfect complementary seeds\n");
+	fprintf(stderr, "     (default -m 0:0 means no mismatch                          )\n");
+	fprintf(stderr, "     (when c>0, please set p>0 to avoid overlaps, p=c at default)\n");
 	fprintf(stderr, "  -x <float>, --seed_energy=F\n");
-	fprintf(stderr, "                 set energy per length threshold to filters seeds (default=0)\n");
+	fprintf(stderr, "     set energy per length threshold to filters seeds (default=0)\n");
 	fprintf(stderr, "------------------------------- BANDED RIsearch ------------------------------\n");
 	fprintf(stderr, "  -b band,     --band=band\n");
-	fprintf(stderr, "                 Integer, size of the bands limiting the search.\n");
-	fprintf(stderr, "                 The min size is 1; use the seed option to avoid any bulge.\n");
+	fprintf(stderr, "     Integer, size of the bands limiting the search.\n");
+	fprintf(stderr, "     The min size is 1; use the seed option to avoid any bulge.\n");
 	fprintf(stderr, "------------------------------- MODEL OPTIONS --------------------------------\n");
+	fprintf(stderr, "  -d <int>, --penalty=dP\n");
+	fprintf(stderr, "     per-nucleotide extension penalty given in dacal/mol\n");
+	fprintf(stderr, "     (recommended: 30, default: 0)\n");
 	fprintf(stderr, "  -l <int>,   --extension=L \n");
-	fprintf(stderr, "                 max extension length(L) on the seed (do DP for max this\n");
-	fprintf(stderr, "                 length up- and downstream of seed) (default L=20)\n");
-	fprintf(stderr, "  -d <int>,   --penalty=dP\n");
-	fprintf(stderr, "                 per-nucleotide extension penalty given in dacal/mol\n");
-	fprintf(stderr, "                 (recommended: 30, default: 0)\n");
+	fprintf(stderr, "     max extension length(L) on the seed (do DP for max this\n");
+	fprintf(stderr, "     length up- and downstream of seed) (default L=20)\n");
 	fprintf(stderr, "-------------------------- ENERGY MATRIX OPTIONS -----------------------------\n");
-	fprintf(stderr, "  -z mat,     --matrix=mat\n");
-	fprintf(stderr, "                 su95 for RNA-DNA duplexes\n");
-	fprintf(stderr, "                 su95c2 for RNA-DNA duplexes modified for CRISPRoff2\n");
-	fprintf(stderr, "                 su95wk11 for RNA-DNA duplexes with mismatches open/close as\n");
-	fprintf(stderr, "                  loop size 2\n");
-	fprintf(stderr, "                 su95_noGU for RNA-DNA duplexes (G-T and U-G are mismatches)\n");
-	fprintf(stderr, "                 sl04_noGU for DNA-DNA duplexes (G-T is a mismatch)\n");
-	fprintf(stderr, "                  the _noGU automatically activates the --noGUseed option\n");
-	fprintf(stderr, "  -y mat2,     --matrix2=mat2\n");
-	fprintf(stderr, "                 Only needed if you design your own energy matrices\n");
-	fprintf(stderr, "  -K T1[,T2,T3],     --temperature=T0[,T1,T2]\n");
-	fprintf(stderr, "                 Temperatures in Kelvin for scaling of energies. T0 is\n");
-	fprintf(stderr, "                  the temperature tobe scaled to. T1 and T2 are only\n");
-	fprintf(stderr, "                  needed if you design your own energy parameters.\n");
-	fprintf(stderr, "  -M PATH,     Path to directory holding the energy matrices\n");
+	fprintf(stderr, "  -z mat, --matrix=mat\n");
+	fprintf(stderr, "  -y mat2, --matrix2=mat2\n");
+	fprintf(stderr, "     Only needed if you design your own energy matrices\n");
+	fprintf(stderr, "  -K T1[,T2,T3], --temperature=T0[,T1,T2]\n");
+	fprintf(stderr, "     Temperatures in Kelvin for scaling of energies. T0 is\n");
+	fprintf(stderr, "     the temperature to be scaled to. T1 and T2 are only\n");
+	fprintf(stderr, "     needed if you design your own energy parameters.\n");
+	fprintf(stderr, "  -M PATH,   Path to directory holding the energy matrices\n");
 	fprintf(stderr, "------------------------------- OUTPUT AND FILTERING -------------------------\n");
 	fprintf(stderr, "  -e <float>, --energy=dG\n");
-	fprintf(stderr, "                 set deltaG energy threshold in kcal/mol to filter predictions\n");
-	fprintf(stderr, "                 (default=-20 for RIsearch2)\n");
-	fprintf(stderr, "  -1          --one_vs_one\n");
-	fprintf(stderr, "                 only print results where query and target name matches\n");
-	fprintf(stderr, "  -p,         --report_alignment     \n");
-	fprintf(stderr, "                 report in detailed format\n");
-	fprintf(stderr, "  -p2,        --report_alignment=2   \n");
-	fprintf(stderr, "                 report in a simple format with CIGAR-like \n");
-	fprintf(stderr, "                 string for interaction structure\n");
-	fprintf(stderr, "  -p3,        --report_alignment=3   \n");
-	fprintf(stderr, "                 report in a simple format together with \n");
-	fprintf(stderr, "                 binding site (3'->5'), flanking 5'end (3'->5') and \n");
-	fprintf(stderr, "                 flanking 3'end (5'->3') sequences of the target\n");
-	fprintf(stderr, "                 (for post-processing of CRISPR off-target predictions)\n");
-	fprintf(stderr, "  -p4,        --report_alignment=3   \n");
-	fprintf(stderr, "                 report in the format target, start, strand, energy\n");
+	fprintf(stderr, "     set deltaG energy threshold in kcal/mol to filter predictions\n");
+	fprintf(stderr, "     (default=-20 for RIsearch2)\n");
+	fprintf(stderr, "  -1, --one_vs_one\n");
+	fprintf(stderr, "     only print results where query and target name matches\n");
+	fprintf(stderr, "  -p1,-p     one line per hit, incl. interaction string, still header for each pair (query / target)\n");
+	fprintf(stderr, "  -p2, --report_alignment=2   \n");
+	fprintf(stderr, "     report in a simple format with CIGAR-like \n");
+	fprintf(stderr, "     string for interaction structure\n");
+	fprintf(stderr, "  -p3, --report_alignment=3   \n");
+	fprintf(stderr, "     report in a simple format together with \n");
+	fprintf(stderr, "     binding site (3'->5'), flanking 5'end (3'->5') and \n");
+	fprintf(stderr, "     flanking 3'end (5'->3') sequences of the target\n");
+	fprintf(stderr, "     (for post-processing of CRISPR off-target predictions)\n");
+	fprintf(stderr, "  -p4, --report_alignment=3   \n");
+	fprintf(stderr, "     report in the format target, start, strand, energy\n");
 	fprintf(stderr, "--------------------------- CRISPR related options ---------------------------\n");
 	fprintf(stderr, "  -3 <reg>,   --three_prime_match=PC\n");
-	fprintf(stderr, "                 report only predictions with a matching 3' PAM forward\n");
-	fprintf(stderr, "                  complement for cas9 this corresponds to PC=^(.cc|.uc|.cu)\n");
-	fprintf(stderr, "                  matching NGG/NAG/NGA 3' PAMs\n");
-	fprintf(stderr, "                  report mode 3/4 required\n");
+	fprintf(stderr, "     report only predictions with a matching 3' PAM forward\n");
+	fprintf(stderr, "     complement for cas9 this corresponds to PC=^(.cc|.uc|.cu)\n");
+	fprintf(stderr, "     matching NGG/NAG/NGA 3' PAMs\n");
+	fprintf(stderr, "     report mode 3/4 required\n");
 	fprintf(stderr, "  -5 <reg>,   --five_prime_match=PC\n");
-	fprintf(stderr, "                 report only predictions with a matching 5' PAM reverse\n");
-	fprintf(stderr, "                  complement for cas12a this corresponds to PC=^([^a]aaa)\n");
-	fprintf(stderr, "                  matching TTTV 5'PAMs\n");
-	fprintf(stderr, "                  report mode 3/4 required\n");
+	fprintf(stderr, "     report only predictions with a matching 5' PAM reverse\n");
+	fprintf(stderr, "     complement for cas12a this corresponds to PC=^([^a]aaa)\n");
+	fprintf(stderr, "     matching TTTV 5'PAMs\n");
+	fprintf(stderr, "     report mode 3/4 required\n");
 	fprintf(stderr, "  -w arr,     --weights=arr\n");
-	fprintf(stderr, "                 CRISPR_gRNApPAM to weight gRNA-target interactions by\n");
-	fprintf(stderr, "                  CRISPR/Cas9 impact.\n");
-	fprintf(stderr, "  -C dir,        Move results to dir (must exists) when they are completed.\n");
+	fprintf(stderr, "     CRISPR_gRNApPAM to weight gRNA-target interactions by\n");
+	fprintf(stderr, "     CRISPR/Cas9 impact.\n");
 	fprintf(stderr, "--------------------------------- MISC ------------------------------------\n");
+	fprintf(stderr, "  -C dir,        Move results to dir (must exists) when they are completed.\n");
 	fprintf(stderr, "  -t <int>,   --threads=N\n");
-	fprintf(stderr, "                 set maximum number of threads to use (default=1)\n");
+	fprintf(stderr, "     set maximum number of threads to use (default=1)\n");
 	fprintf(stderr, "  --verbose      verbose output\n");
 	fprintf(stderr, "\n");
 	exit(1);

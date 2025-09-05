@@ -1,7 +1,7 @@
-/***********************************************************
-  RIsearch v 1.2   --   RNA-RNA interaction search
-  Copyright 2012 Anne Wenzel <wenzel@rth.dk> (RIsearch v.1.0 and v.1.1)
-  Copyright 2021 Giulia I Corsi <giulia@rth.dk> (Extension of RIsearch v.1.1 in RIsearch v.1.2)
+/*********************************************************************
+  RIsearch1   --   RNA-RNA interaction search
+
+  Copyright (c) 2016-2025 by the contributors (see AUTHORS file)
 
   This file is part of RIsearch.
 
@@ -18,8 +18,7 @@
   You should have received a copy of the GNU General Public License
   along with RIsearch, see file COPYING.
   If not, see <http://www.gnu.org/licenses/>.
-
-***********************************************************/
+*********************************************************************/
 
 #include <stdio.h>
 #include <string.h>
@@ -83,6 +82,7 @@ void set_alignment_symbols (char query_nt, char target_nt,
 			    char *query_alignment, char *target_alignment);
 
 /* values to be overwritten by command line parameters */
+Qt_type qt_type = RRNA;
 const char *matname = "t04", *matname2 = NULL;
 const char *matpath = MATPATH;
 float tempK[3] = {
@@ -121,7 +121,7 @@ int main(int argc, char *argv[])
 
 	options(argc, argv);
 
-	getMat(matname, matname2, matpath, tempK, &dsm[0][0][0][0]);
+	getMat(qt_type, matname, matname2, matpath, tempK, &dsm[0][0][0][0]);
 
 	if (seq2file_name) {	/* target given as file - or STDIN */
 		ffpT = OpenFASTA(seq2file_name);
@@ -492,52 +492,69 @@ index2nt (unsigned char ix)
 
 void usage(char *progname)
 {
-	fprintf(stderr, "====== RIsearch1 ver 1.2 ======\n= RNA-RNA interaction search =\n");
+	fprintf(stderr, "=============================== RIsearch1 v%s ===============================\n", PACKAGE_VERSION);
 	fprintf(stderr, "================ Energy based RNA-RNA interaction predictions ================\n\n");
 	fprintf(stderr, "Usage:         %s [ARGUMENTS]\n\n", progname);
-	fprintf(stderr, "   [INPUT]\n\n");
-	fprintf(stderr, "        -q <file> Fasta file containing query sequence(s)\n");
-	fprintf(stderr, "        -t <file> Fasta file containing target sequence(s) or\n");
-	fprintf(stderr, "                  specify '-t -' to pass the fasta formatted input to STDIN\n");
-	fprintf(stderr, "   [OPTIONS]\n");
+	fprintf(stderr, "  -h,         --help\n");
+	fprintf(stderr, "     show this message\n");
+	fprintf(stderr, "--------------------------- INTERACTION PREDICTION ---------------------------\n");
+	fprintf(stderr, "  -q <FILE>, --query=FILE (.fa or .fa.gz)\n");
+	fprintf(stderr, "     FASTA file for query sequence(s), use '-' for stdin\n");
+	fprintf(stderr, "  -i <FILE>, --index=FILE\n");
+	fprintf(stderr, "     pregenerated suffix array file for target sequence(s)\n");
+	fprintf(stderr, "------------------------------- MODEL OPTIONS --------------------------------\n");
+	fprintf(stderr, "  -d <int>, --penalty=dP\n");
+	fprintf(stderr, "     per-nucleotide extension penalty given in dacal/mol\n");
+	fprintf(stderr, "     (recommended: 30, default: 0)\n");
 	fprintf(stderr, "  -s <int>  threshold for suboptimal duplexes (minimum score, NOT energy)\n");
 	fprintf(stderr, "  -n <int>  neighborhood (only backtrack from best position within this\n");
 	fprintf(stderr, "     range - to omit many overlapping results), default is 0, backtrack all\n");
 	fprintf(stderr, "  -f <int> force the interaction to start and end, respectively, at the 3'and\n");
 	fprintf(stderr, "     5' end of target and end at the query's 3' end. Takes input int >0.\n");
 	fprintf(stderr, "     Use a high value, e.g. 200*max(length(query),length(target))\n");
-	fprintf(stderr, "     It is currently not possible to compute weighted interactions without a fixed start and end.\n");
-	fprintf(stderr, "     This option requires -w.\n");
+	fprintf(stderr, "     It is currently not possible to compute weighted interactions without a\n");
+	fprintf(stderr, "     fixed start and end. This option requires -w.\n");
 	fprintf(stderr, "  -l <int>  max trace back length (default: 40)\n");
-	fprintf(stderr, "  -m <str>  matrix to use, t99 or t04(def) or su95 or su95_noGU or slh04_noGU \n");
-	fprintf(stderr, "  -w <str>  weights vector to use, CRISPR_20nt_5p_3p or noweights. \n");
-	fprintf(stderr, "     Weights length mush be >= than the length of the query -1.\n");
-	fprintf(stderr, "     This option requires -f. Please set -f appropriately, do not try to\n");
-	fprintf(stderr, "     use a low -f value to avoid the force start. \n");
-	fprintf(stderr, "     Launched with this option, RIsearch does not perform step 1 (memory optimization) of \n");
-	fprintf(stderr, "     the algorithm (see Wenzel et al. 2012).\n");
-	fprintf(stderr, "  -d <int>,   --penalty=dP\n");
-	fprintf(stderr, "                 per-nucleotide extension penalty given in dacal/mol\n");
-	fprintf(stderr, "                 (recommended: 30, default: 0)\n");
-	fprintf(stderr, "  -e <flt> --energy=dG\n");
-	fprintf(stderr, "                 set deltaG energy threshold (in kcal/mol) to filter predictions\n");
-	fprintf(stderr, "                 (default=-20 for RIsearch2)\n");
-
-	fprintf(stderr, "  -1        When multiple queries and targets are given, run them one_vs_one\n");
-	fprintf(stderr, "  -p        switch for short output, for backwards compatibility, same as -p1\n");
-	fprintf(stderr, "  -p1     one line per hit, incl. interaction string, still header for each pair (query / target)\n");
-	fprintf(stderr, "  -p2     one line per hit, tab seperated 'Qname Qbeg Qend Tname Tbeg Tend score energy'; no header; 'best' hit only once, not first\n");
-	fprintf(stderr, "  -p3     one line per pair with number of hits that would have been printed, tab seperated 'Qname Tname hit-count'\n");
-	fprintf(stderr, "      without p (and with p1), the 'best' interaction (per pair) is always shown first, and repeated in the list of results\n");
+	fprintf(stderr, "-------------------------- ENERGY MATRIX OPTIONS -----------------------------\n");
+	fprintf(stderr, "  -N <str>  Query/Target type, one of RNA/RNA(default), DNA/DNA, RNA/DNA or \n");
+	fprintf(stderr, "            DNA/RNA, makes the matrix default to t04.v3, slh04.v3, su95.v3 or\n");
+	fprintf(stderr, "            su95.v3, respectively.; \n");
+	fprintf(stderr, "  -z mat, --matrix=mat\n");
+	fprintf(stderr, "  -y mat2, --matrix2=mat2\n");
+	fprintf(stderr, "     Only needed if you design your own energy matrices\n");
+	fprintf(stderr, "  -K T1[,T2,T3], --temperature=T0[,T1,T2]\n");
+	fprintf(stderr, "     Temperatures in Kelvin for scaling of energies. T0 is\n");
+	fprintf(stderr, "     the temperature to be scaled to. T1 and T2 are only\n");
+	fprintf(stderr, "     needed if you design your own energy parameters.\n");
+	fprintf(stderr, "  -M PATH,   Path to directory holding the energy matrices\n");
+	fprintf(stderr, "------------------------------- OUTPUT AND FILTERING -------------------------\n");
+	fprintf(stderr, "  -e <float>, --energy=dG\n");
+	fprintf(stderr, "     set deltaG energy threshold in kcal/mol to filter predictions\n");
+	fprintf(stderr, "     (default=-20 for RIsearch2)\n");
+	fprintf(stderr, "  -1, --one_vs_one\n");
+	fprintf(stderr, "     When multiple queries and targets are given, run them one_vs_one\n");
+	fprintf(stderr, "  -p         switch for short output, for backwards compatibility, same as -p1\n");
+	fprintf(stderr, "  -p1        one line per hit, incl. interaction string, still header for\n");
+	fprintf(stderr, "             each pair (query / target)\n");
+	fprintf(stderr, "  -p2        one line per hit, tab seperated 'Qname Qbeg Qend Tname Tbeg Tend\n");
+	fprintf(stderr, "             score energy'; no header; 'best' hit only once, not first\n");
+	fprintf(stderr, "  -p3        one line per pair with number of hits that would have been\n");
+	fprintf(stderr, "             printed, tab seperated 'Qname Tname hit-count'\n");
+	fprintf(stderr, "             Without p (and with p1), the 'best' interaction (per pair) is\n");
+	fprintf(stderr, "             always shown first, and repeated in the list of results\n");
+	fprintf(stderr, "--------------------------- CRISPR related options ---------------------------\n");
+	fprintf(stderr, "  -w arr,     --weights=arr\n");
+	fprintf(stderr, "     CRISPR_gRNApPAM to weight gRNA-target interactions by\n");
+	fprintf(stderr, "     CRISPR/Cas9 impact.\n");
 	fprintf(stderr, "  --verbose      verbose output\n");
-	fprintf(stderr, "\n\n");
+	fprintf(stderr, "\n");
 	exit(1);
 }
 
 void options(int argc, char *argv[])
 {
 	char c;
-	while ((c = getopt(argc, argv, "1vq:t:Q:T:d:M:K:y:z:m:s:e:n:w:l:f:p::")) != -1)
+	while ((c = getopt(argc, argv, "1vq:t:Q:T:d:M:N:K:y:z:m:s:e:n:w:l:f:p::")) != -1)
 		switch (c) {
 		case '1':
 			all_vs_all = 0;
@@ -606,6 +623,18 @@ void options(int argc, char *argv[])
 			break;
 		case 'f':
 			force_start_val = atoi(optarg);
+			break;
+		case 'N':
+			if (strcmp(optarg, "RNA/RNA")==0) {qt_type=RRNA;}
+			else if (strcmp(optarg, "DNA/DNA")==0) {qt_type=DDNA;}
+			else if (strcmp(optarg, "RNA/DNA")==0) {qt_type=RDNA;}
+			else if (strcmp(optarg, "DNA/RNA")==0) {qt_type=DRNA;}
+			else {
+				fprintf(stderr, "Parameter -%c should be one of RNA/RNA, DNA/DNA, RNA/DNA and DNA/RNA.\n", optopt);
+				usage(argv[0]);
+			}
+			fprintf(stderr, "Parameter qt_type=%d qt_path=%s should be one of RNA/RNA, DNA/DNA, RNA/DNA and DNA/RNA.\n", qt_type, Qt_path[qt_type]);
+			//exit(0);
 			break;
 		case 'p':
 			if (optarg)
