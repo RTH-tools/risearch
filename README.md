@@ -6,12 +6,15 @@ RIsearch consists of two programs, RIsearch1 and RIsearch2
 
 ## Installation
 
-First, make sure that you have the following programs installed:
+First, make sure that you have the following software installed:
 
+* autoconf
+* automake
+* cmake
 * gcc
 * make
-* CMake
-* libpcre3-devel
+
+* libpcre3-dev
 
 To build and install
 
@@ -21,11 +24,13 @@ To build and install
 	make install
 
 ## Executing RIsearch
+
 Here we provide examples on how to run RIsearch2 and RIsearch1 with default parameters.
 
 See the manuals for RIsearch2 and RIsearch1 for the full list of options and examples.
 
 ### RIsearch1
+
 To run RIsearch1 in default settings use the following command:
 
 	RIsearch -q query.fa -t target.fa
@@ -36,8 +41,8 @@ Alternatively, single sequences can be given directly on commandline with
 Note: the files query.fa and target.fa may contain several sequences, 
 RIsearch will scan all vs. all
 
-
 ### RIsearch2
+
 First, generate the index structure for the target sequence(s) in the file target.fa
 and store them in the file target.suf. 
 
