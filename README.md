@@ -1,36 +1,56 @@
 # RIsearch
-RIsearch consists of two programs, RIsearch1 and RIsearch2
-
-* RIsearch: a tool for large-scale RNA–RNA, RNA-DNA, and DNA-DNA interaction prediction
-* RIsearch2 is a program for fast RNA-RNA interaction prediction using a seed-and-extend approach
+RIsearch: a tool for large-scale RNA–RNA, RNA-DNA, and DNA-DNA interaction prediction
 
 ## Installation
 
-First, make sure that you have the following software installed:
+### RIsearch1
+First, make sure that you have the following programs installed:
 
-* autoconf
-* automake
-* cmake
 * gcc
 * make
 
-* libpcre3-dev
+You can compile RIsearch1 by running the following from within the RIsearch1 folder.
 
-To build and install
+	make RISEARCH
 
-	./readybuild.sh
-	./configure
-	make
-	make install
+### RIsearch2
+
+First, make sure that you have the following programs installed:
+
+* gcc
+* make
+* CMake
+
+Now, you should attempt to recompile the binary using the following command from
+within the RIsearch2 folder:
+
+	./rebuild.sh
+
+If that does not work, and you have the gcc and CMake programs installed,
+please report back to the author.
 
 ## Executing RIsearch
+For more convenient use of RIsearch, add the installation folder or RIsearch1 and 
+RIsearch2 to your PATH or copy the binary to a location that is in $PATH.
 
 Here we provide examples on how to run RIsearch2 and RIsearch1 with default parameters.
 
 See the manuals for RIsearch2 and RIsearch1 for the full list of options and examples.
 
-### RIsearch1
+### RIsearch2
+First, generate the index structure for the target sequence(s) in the file target.fa
+and store them in the file target.suf. 
 
+	risearch2.x -c target.fa -o target.suf
+
+To run RIsearch2 in default settings use the following command:
+
+	risearch2.x -q query.fa -i target.suf
+
+Note: the files query.fa and target.fa may contain several sequences, 
+RIsearch will scan all vs. all
+
+### RIsearch1
 To run RIsearch1 in default settings use the following command:
 
 	RIsearch -q query.fa -t target.fa
@@ -41,46 +61,20 @@ Alternatively, single sequences can be given directly on commandline with
 Note: the files query.fa and target.fa may contain several sequences, 
 RIsearch will scan all vs. all
 
-### RIsearch2
-
-First, generate the index structure for the target sequence(s) in the file target.fa
-and store them in the file target.suf. 
-
-	RIsearch2 -c target.fa -o target.suf
-
-To run RIsearch2 in default settings use the following command:
-
-	RIsearch2 -q query.fa -i target.suf
-
-Note: the files query.fa and target.fa may contain several sequences, 
-RIsearch will scan all vs. all
-
-## RIsearch2 siRNA off-target prediction
-
-siRNA off-target Discovery Pipeline.
-
-	./scripts/pipeline.py
-
-Script that divides the input target sequence in 100kb pieces, runs RNAplfold
-with them and packs the results into a binary format to be able to pass them
-into the pipeline.
-
-	 ./src/run_RNAplfold_and_pack_results.py
-
 ## RIsearch manuals
-
-Please read the full manuals for RIsearch1 and RIsearch2, included in the
-documentation folder.
+Please read the full manuals for RIsearch1 and RIsearch2, included in the installation folders.
 
 ## Copyright
 
-Copyright 2015-2025 by the contributors (see AUTHORS and RIsearch1/README files)
+Copyright 2021 by the contributors (see RIsearch2/AUTHORS and RIsearch1/README files)
 
-RIsearchis released under the GNU General Public License version 3. Note that
-libdivsufsort is packaged along with RIsearch. Libdivsufsort comes with its own
-authors and copyright under libdivsufsort-2.0.1/{AUTHORS,COPYING}
+RIsearch1 and Risearch2 are released under the GNU General Public License
+version 3. Note that libdivsufsort is packaged along with RIsearch.
+Libdivsufsort comes with its own authors and copyright under
+RIsearch2/libdivsufsort-2.0.1/{AUTHORS,COPYING}
 
 GNU GENERAL PUBLIC LICENSE
+
 
 This is a free software: you can redistribute it and/or modify it under the
 terms of the GNU General Public License, either version 3 of the License, or
@@ -103,5 +97,5 @@ Wenzel A, Akbasli E, Gorodkin J. *Bioinformatics*. 2012 Nov 1;28(21):2738-46. Ep
 
 ## Contact
 
-In case of problems or bug reports, please contact: <software@rth.dk>
+In case of problems or bug reports, please contact: <software+crispron@rth.dk>
 
