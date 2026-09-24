@@ -47,7 +47,6 @@
 #[doc(hidden)]
 pub mod adapter;
 pub mod alignment;
-mod cli;
 pub mod config;
 #[doc(hidden)]
 pub mod dp;
@@ -81,16 +80,6 @@ pub use config::{
 pub use output::TextSink;
 pub use search::{run_search, HitSink, SearchHit, VecSink};
 pub use types::DsmId;
-
-#[doc(hidden)]
-pub use cli::args::SearchArgs;
-
-/// Parse this process's command-line arguments and run the requested command.
-///
-/// The `risearch` binary is a thin shim over this function.
-pub fn cli_main() -> anyhow::Result<()> {
-    cli::main()
-}
 
 #[cfg(kani)]
 mod proofs;

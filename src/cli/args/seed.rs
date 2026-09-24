@@ -1,6 +1,6 @@
-use crate::config::SeedConfig;
 use anyhow::Error;
 use log::warn;
+use risearch::config::SeedConfig;
 use std::str::FromStr;
 
 /// Resolved (seed_start, seed_end, seed_length) bounds from CLI parsing.
@@ -325,7 +325,7 @@ impl TryFrom<SeedArgs> for SeedConfig {
 #[cfg(test)]
 mod tests {
     use super::{LegacyMismatchSpec, LegacySeedSpec, SeedArgs, SeedBounds};
-    use crate::config::SeedConfig;
+    use risearch::config::SeedConfig;
     use std::str::FromStr;
 
     #[test]

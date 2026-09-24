@@ -1,4 +1,4 @@
-use crate::config::{OutputCompression, OutputConfig, OutputFormat};
+use risearch::config::{OutputCompression, OutputConfig, OutputFormat};
 
 use anyhow::{bail, Context, Error, Result};
 use clap::ValueEnum;

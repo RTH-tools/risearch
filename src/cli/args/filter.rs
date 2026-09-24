@@ -1,5 +1,5 @@
-use crate::config::FilterConfig;
-use crate::types::Energy;
+use risearch::config::FilterConfig;
+use risearch::types::Energy;
 
 /// Arguments for filtering and pruning policies
 #[derive(clap::Args, Debug, Clone)]

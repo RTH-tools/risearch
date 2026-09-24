@@ -6,8 +6,8 @@ use anyhow::{Context, Result};
 use log::{debug, info, trace, warn};
 
 use crate::cli::args::validate_output_parent;
-use crate::fastx::read_sequences;
-use crate::{output, search, QueryRegistry, TargetRegistry};
+use risearch::fastx::read_sequences;
+use risearch::{output, search, QueryRegistry, TargetRegistry};
 
 use crate::cli::{Cli, Commands, SearchArgs};
 

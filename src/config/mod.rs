@@ -9,8 +9,6 @@
 
 use std::path::Path;
 
-use clap::ValueEnum;
-
 use crate::dp::MAX_EXT;
 use crate::dsm::DsmRegistry;
 use crate::error::{Error, Result};
@@ -41,8 +39,12 @@ pub const MAX_EXTENSION: i32 = MAX_EXT as i32;
 // =============================================================================
 
 /// Layout of each reported hit.
-#[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Eq, Default)]
-#[clap(rename_all = "lowercase")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+#[cfg_attr(
+    feature = "cli",
+    derive(clap::ValueEnum),
+    clap(rename_all = "lowercase")
+)]
 pub enum OutputFormat {
     /// Detailed format with alignment (C: -p1)
     Detailed,

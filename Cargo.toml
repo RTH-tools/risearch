@@ -8,14 +8,6 @@ rust-version = "1.88"
 edition = "2021"
 license = "BUSL-1.1"
 
-[workspace.dependencies]
-anyhow = "1.0.47"
-clap = { version = "4.0.0", default-features = false, features = [
-  "std",
-  "help",
-  "usage",
-] }
-
 [package]
 name = "risearch"
 version.workspace = true
@@ -37,14 +29,20 @@ include = [
 ]
 
 [features]
-default = ["mimalloc"]
+default = ["cli", "mimalloc"]
+cli = ["dep:anyhow", "dep:clap", "dep:env_logger"]
 prof = []
 openmp = ["libsais/openmp"]
 
 [dependencies]
-anyhow.workspace = true
-clap = { workspace = true, features = ["derive"] }
-env_logger = { version = "0.11.0", features = ["color"] }
+anyhow = { version = "1.0.47", optional = true }
+clap = { version = "4.0.0", default-features = false, features = [
+  "std",
+  "help",
+  "usage",
+  "derive",
+], optional = true }
+env_logger = { version = "0.11.0", features = ["color"], optional = true }
 flate2 = { version = "1.0.30", default-features = false, features = ["zlib"] }
 fs-err = "3.0.0"
 itoa = "1.0.0"
@@ -68,6 +66,15 @@ proptest = "1.11"
 rstest = "0.26.1"
 tempfile = "3.27.0"
 
+[[bin]]
+name = "risearch"
+path = "src/main.rs"
+required-features = ["cli"]
+
+[[test]]
+name = "cli_library_agreement"
+required-features = ["cli"]
+
 [[bench]]
 name = "format"
 harness = false
@@ -79,6 +86,7 @@ harness = false
 [[bench]]
 name = "search"
 harness = false
+required-features = ["mimalloc"]
 
 [[bench]]
 name = "seed"

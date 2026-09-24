@@ -1,8 +1,8 @@
-use crate::config::{
+use risearch::config::{
     ScoreConfig, MAX_PENALTY_KCAL, MAX_TEMPERATURE_C, MIN_PENALTY_KCAL, MIN_TEMPERATURE_C,
 };
-use crate::dsm::DsmRegistry;
-use crate::types::{DsmId, Energy};
+use risearch::dsm::DsmRegistry;
+use risearch::types::{DsmId, Energy};
 
 fn parse_penalty(s: &str) -> Result<Energy, String> {
     let v: f64 = s.parse().map_err(|e| format!("{e}"))?;

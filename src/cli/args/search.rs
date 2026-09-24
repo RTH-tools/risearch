@@ -1,11 +1,11 @@
-use crate::config::{ExtendConfig, OutputConfig, SearchConfig};
 use anyhow::Error;
+use risearch::config::{ExtendConfig, OutputConfig, SearchConfig};
 
 use super::{ExtendArgs, FilterArgs, InputArgs, OutputArgs, ScoreArgs, SeedArgs};
 
 /// Arguments that apply to the `search` subcommand
 #[derive(clap::Args, Debug, Clone)]
-pub struct SearchArgs {
+pub(crate) struct SearchArgs {
     #[command(flatten)]
     pub(crate) input: InputArgs,
 
@@ -29,7 +29,7 @@ impl SearchArgs {
     /// Resolve CLI-only output policy alongside the frontend-independent search
     /// configuration. Output format controls whether traceback is worth doing,
     /// but the output settings themselves do not belong in [`SearchConfig`].
-    pub fn try_into_configs(self) -> Result<(SearchConfig, OutputConfig), Error> {
+    pub(crate) fn try_into_configs(self) -> Result<(SearchConfig, OutputConfig), Error> {
         let output: OutputConfig = self.output.try_into()?;
         let mut extend: ExtendConfig = self.extend.into();
         extend.build_alignment = output.format.needs_alignment();

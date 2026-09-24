@@ -47,7 +47,7 @@ impl DsmRegistry {
     }
 
     /// Accept a bundled identifier or a path to an existing TSV table.
-    pub(crate) fn parse_id(s: &str) -> Result<DsmId> {
+    pub fn parse_id(s: &str) -> Result<DsmId> {
         if NAMES.contains(&s) || Path::new(s).is_file() {
             Ok(DsmId(s.to_string()))
         } else {

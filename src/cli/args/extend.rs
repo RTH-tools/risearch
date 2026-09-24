@@ -1,4 +1,4 @@
-use crate::config::{ExtendConfig, MAX_EXTENSION, UNLIMITED_EXTENSION};
+use risearch::config::{ExtendConfig, MAX_EXTENSION, UNLIMITED_EXTENSION};
 
 /// Arguments for seed extension strategy
 #[derive(clap::Args, Debug, Clone)]

@@ -6,7 +6,7 @@ mod score;
 mod search;
 mod seed;
 
-pub use search::SearchArgs;
+pub(crate) use search::SearchArgs;
 
 pub(crate) use extend::ExtendArgs;
 pub(crate) use filter::FilterArgs;
