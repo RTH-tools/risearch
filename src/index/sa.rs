@@ -4,6 +4,7 @@
 //! suffix positions together. Consumers must not mix the positions from one
 //! index with the sequence from another.
 
+use std::num::NonZeroUsize;
 use std::ops::Range;
 
 use libsais::SuffixArrayConstruction;
@@ -116,13 +117,13 @@ impl SuffixIndex {
     /// [`Base::Gap`] must include it in `sequence` before calling this method.
     ///
     /// When the `openmp` feature is enabled, `threads` selects the libsais
-    /// worker count. `None` and `Some(0)` use the OpenMP default. Without that
-    /// feature, `threads` is ignored.
+    /// worker count and `None` uses the OpenMP default. Without that feature,
+    /// `threads` is ignored.
     ///
     /// # Errors
     ///
     /// Returns an error if libsais cannot construct the suffix array.
-    pub(crate) fn build(sequence: Vec<Base>, threads: Option<usize>) -> Result<Self, Error> {
+    pub(crate) fn build(sequence: Vec<Base>, threads: Option<NonZeroUsize>) -> Result<Self, Error> {
         let suffix_array = build_suffix_array(&sequence, threads)?;
         Ok(Self {
             sequence: sequence.into_iter().map(Base::as_u8).collect(),
@@ -144,7 +145,7 @@ impl SuffixIndex {
         sequence.push(Base::Gap);
 
         // A per-query seed is tens of bases; an OpenMP team would cost more than the sort.
-        let mut index = Self::build(sequence, Some(1))?;
+        let mut index = Self::build(sequence, Some(NonZeroUsize::MIN))?;
         let max_valid_start = seed.len().saturating_sub(min_len) as u64;
         index
             .suffix_array
@@ -160,7 +161,7 @@ impl SuffixIndex {
     }
 }
 
-fn build_suffix_array(bases: &[Base], threads: Option<usize>) -> Result<Vec<u64>, Error> {
+fn build_suffix_array(bases: &[Base], threads: Option<NonZeroUsize>) -> Result<Vec<u64>, Error> {
     // SAFETY: Base is #[repr(u8)] and its enum discriminants perfectly
     // match the required suffix array lexicographical sort order.
     let sort_bytes: &[u8] =
@@ -169,11 +170,10 @@ fn build_suffix_array(bases: &[Base], threads: Option<usize>) -> Result<Vec<u64>
     // Build the suffix array. Use OpenMP if feature is enabled.
     #[cfg(feature = "openmp")]
     let sa_raw = {
-        // Only n >= 1 reaches `fixed()`, which panics on 0; `Some(0)`/`None`
-        // fold into the auto arm. Cap at u16::MAX, the libsais count width.
+        // Cap at u16::MAX, the libsais count width.
         let thread_count = match threads {
-            Some(n) if n > 0 => libsais::ThreadCount::fixed(n.min(u16::MAX as usize) as u16),
-            _ => libsais::ThreadCount::openmp_default(),
+            Some(n) => libsais::ThreadCount::fixed(n.get().min(u16::MAX as usize) as u16),
+            None => libsais::ThreadCount::openmp_default(),
         };
         SuffixArrayConstruction::for_text(sort_bytes)
             .in_owned_buffer()

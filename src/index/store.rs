@@ -1,5 +1,6 @@
 //! Runtime handle over a mapped target index file.
 
+use std::num::NonZeroUsize;
 use std::path::Path;
 
 use fs_err::File;
@@ -27,9 +28,10 @@ impl TargetRegistry {
     ///
     /// The index is held in an anonymous mapping carrying the same image
     /// [`save`](Self::save) writes, so a built and a reopened index are the same
-    /// value. `threads` controls suffix-index construction parallelism; `None`
-    /// (or `Some(0)`) means auto.
-    pub fn build(targets: Vec<(String, Sequence)>, threads: Option<usize>) -> Result<Self> {
+    /// value. `threads` is the OpenMP team for suffix-array construction with
+    /// the `openmp` feature and is ignored without it; `None` uses the OpenMP
+    /// default (`OMP_NUM_THREADS`, else every core).
+    pub fn build(targets: Vec<(String, Sequence)>, threads: Option<NonZeroUsize>) -> Result<Self> {
         if targets.is_empty() {
             return Err(Error::Input("No target sequences to index".into()));
         }
@@ -140,6 +142,8 @@ impl TargetRegistry {
 
 #[cfg(test)]
 mod tests {
+    use std::num::NonZeroUsize;
+
     use tempfile::tempdir;
 
     use crate::index::sa::SuffixIndex;
@@ -201,7 +205,7 @@ mod tests {
     fn map_seed_pos_resolves_the_target_block() {
         let sequence = [Base::Gap; 24];
         let offsets = [0, 12];
-        let suffix_index = SuffixIndex::build(sequence.to_vec(), Some(1)).unwrap();
+        let suffix_index = SuffixIndex::build(sequence.to_vec(), Some(NonZeroUsize::MIN)).unwrap();
         let target = crate::index::view::TargetView::new(suffix_index.view(), &offsets);
         let seed_len = 2;
 
@@ -227,7 +231,7 @@ mod tests {
     fn target_view_maps_positions_in_both_strands() {
         let sequence = [Base::Gap; 12];
         let offsets = [0];
-        let suffix_index = SuffixIndex::build(sequence.to_vec(), Some(1)).unwrap();
+        let suffix_index = SuffixIndex::build(sequence.to_vec(), Some(NonZeroUsize::MIN)).unwrap();
         let target = crate::index::view::TargetView::new(suffix_index.view(), &offsets);
         let seq_len = 5;
         let seed_len = 2;

@@ -1,6 +1,7 @@
 mod arrow;
 mod error;
 
+use std::num::NonZeroUsize;
 use std::path::PathBuf;
 
 use arrow_array::ffi_stream::FFI_ArrowArrayStream;
@@ -109,10 +110,10 @@ fn in_pool<R: Send>(pool: Option<&rayon::ThreadPool>, f: impl FnOnce() -> R + Se
 
 /// Rejects 0 and sklearn's `-1` rather than aliasing them: `None` already
 /// means every core, and rayon would silently read 0 as "auto".
-fn thread_count(threads: Option<i64>) -> PyResult<Option<usize>> {
+fn thread_count(threads: Option<i64>) -> PyResult<Option<NonZeroUsize>> {
     match threads {
         None => Ok(None),
-        Some(n) if n >= 1 => Ok(Some(n as usize)),
+        Some(n) if n >= 1 => Ok(NonZeroUsize::new(n as usize)),
         Some(n) => Err(pyo3::exceptions::PyValueError::new_err(format!(
             "threads must be >= 1, or None for every core; got {n}"
         ))),
@@ -128,7 +129,8 @@ fn thread_count(threads: Option<i64>) -> PyResult<Option<usize>> {
 /// output : str | os.PathLike
 ///     Destination path for the binary index (`.idx`).
 /// threads : int, optional
-///     Worker threads for suffix-array construction; `None` uses every core.
+///     OpenMP threads for suffix-array construction; `None` uses the OpenMP
+///     default (OMP_NUM_THREADS, else every core).
 ///     Only takes effect when risearch is built with the `openmp` feature,
 ///     which the published wheels are not; without it construction is
 ///     single-threaded and this is ignored.
@@ -263,7 +265,7 @@ fn search(
     let pool = py
         .detach(|| {
             threads
-                .map(|n| rayon::ThreadPoolBuilder::new().num_threads(n).build())
+                .map(|n| rayon::ThreadPoolBuilder::new().num_threads(n.get()).build())
                 .transpose()
         })
         .map_err(|err| SearchError::new_err(format!("failed to build the thread pool: {err}")))?;

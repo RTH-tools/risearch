@@ -307,6 +307,14 @@ def test_index_accepts_threads(tmp_path):
     assert idx.exists() and idx.stat().st_size > 0
 
 
+@pytest.mark.parametrize("threads", [0, -1])
+def test_threads_below_one_are_rejected(tmp_path, store, threads):
+    with pytest.raises(ValueError, match="threads must be >= 1"):
+        risearch.index(TARGET_FA, tmp_path / "rejected.idx", threads=threads)
+    with pytest.raises(ValueError, match="threads must be >= 1"):
+        risearch.search(QUERY_FA, store, threads=threads)
+
+
 def test_fasta_case_wrapping_and_tu_spelling_preserve_hits(tmp_path):
     query_plain = tmp_path / "query-plain.fa"
     query_variant = tmp_path / "query-variant.fa"

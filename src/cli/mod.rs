@@ -2,6 +2,7 @@ pub(crate) mod app;
 pub(crate) mod args;
 
 use clap::{Parser, Subcommand};
+use std::num::NonZeroUsize;
 use std::path::PathBuf;
 
 pub(crate) use args::SearchArgs;
@@ -26,8 +27,8 @@ pub(crate) struct Cli {
     #[arg(short = 'v', long = "verbose", action = clap::ArgAction::Count, global = true)]
     pub(crate) verbose: u8,
 
-    /// Number of parallel jobs (global). Overrides the
-    /// RAYON_NUM_THREADS / OMP_NUM_THREADS env vars.
+    /// Number of threads (global): search workers, and OpenMP threads for
+    /// `index` in openmp builds. Overrides RAYON_NUM_THREADS / OMP_NUM_THREADS.
     #[arg(
         short = 'j',
         long = "jobs",
@@ -35,7 +36,7 @@ pub(crate) struct Cli {
         value_name = "N",
         global = true
     )]
-    pub(crate) jobs: Option<usize>,
+    pub(crate) jobs: Option<NonZeroUsize>,
 
     #[command(subcommand)]
     pub(crate) command: Commands,
@@ -60,4 +61,16 @@ pub(crate) enum Commands {
 
     /// Search for interactions in the given sequence(s)
     Search(SearchArgs),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Cli;
+    use clap::Parser;
+
+    #[test]
+    fn jobs_must_be_at_least_one() {
+        assert!(Cli::try_parse_from(["risearch", "-j", "0", "index", "in.fa", "out.idx"]).is_err());
+        assert!(Cli::try_parse_from(["risearch", "-j", "1", "index", "in.fa", "out.idx"]).is_ok());
+    }
 }

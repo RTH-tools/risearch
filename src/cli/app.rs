@@ -1,5 +1,6 @@
 //! Application entry point - handles CLI dispatch and orchestration.
 
+use std::num::NonZeroUsize;
 use std::path::Path;
 
 use anyhow::{Context, Result};
@@ -28,7 +29,7 @@ pub(crate) fn run(cli: Cli) -> Result<()> {
 // COMMAND HANDLERS
 // =============================================================================
 
-fn cmd_index(input: &Path, output: &Path, threads: Option<usize>) -> Result<()> {
+fn cmd_index(input: &Path, output: &Path, threads: Option<NonZeroUsize>) -> Result<()> {
     info!("Creating index: {:?} -> {:?}", input, output);
     validate_output_parent(output)?;
     let targets = read_sequences(input).context("Failed to read targets")?;
@@ -70,17 +71,17 @@ fn cmd_search(cmd: &SearchArgs) -> Result<()> {
 // INITIALIZATION
 // =============================================================================
 
-fn init_runtime(verbosity: u8, threads: Option<usize>) -> Result<()> {
+fn init_runtime(verbosity: u8, threads: Option<NonZeroUsize>) -> Result<()> {
     init_logging(verbosity);
     init_thread_pool(threads)
 }
 
-fn init_thread_pool(threads: Option<usize>) -> Result<()> {
+fn init_thread_pool(threads: Option<NonZeroUsize>) -> Result<()> {
     let mut builder = rayon::ThreadPoolBuilder::new();
     // Only pin the count when the user passed one; otherwise let rayon read
     // RAYON_NUM_THREADS and fall back to all cores on its own.
     if let Some(n) = threads {
-        builder = builder.num_threads(n);
+        builder = builder.num_threads(n.get());
     }
     builder
         .build_global()

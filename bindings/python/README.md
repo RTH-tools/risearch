@@ -72,7 +72,7 @@ The `search()` kwargs map to the canonical Rust-facing options:
 - `energy_threshold`, `seed_energy`, `no_max_prune`, `no_dedup`
 - `alignment` — set `False` to skip DP traceback; the `alignment` column becomes all-null
 - `threads` — rayon worker width for query parsing and search; defaults to rayon's
-  choice, which honours `RAYON_NUM_THREADS`. `0` means "all cores", not serial.
+  choice, which honours `RAYON_NUM_THREADS`. Must be at least 1; `0` raises `ValueError`.
 
 ## Logging
 

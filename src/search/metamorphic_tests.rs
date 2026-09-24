@@ -15,6 +15,7 @@ use super::SearchHit;
 use crate::fastx::read_sequences;
 use crate::{Energy, QueryRegistry, SearchConfig, Sequence, TargetRegistry};
 use std::collections::HashSet;
+use std::num::NonZeroUsize;
 use std::path::Path;
 
 /// Mirrors the search settings of `tests/cli_library_agreement.rs`, plus
@@ -104,7 +105,7 @@ fn record_grouping_preserves_named_hits(#[values(1, 4, 7)] group_size: usize) {
     let config = config();
     let queries = load_queries(&data("query.fa"), &config);
     let records = load_records(&data("target.fa"));
-    let combined = TargetRegistry::build(records.clone(), Some(1)).unwrap();
+    let combined = TargetRegistry::build(records.clone(), Some(NonZeroUsize::MIN)).unwrap();
 
     let hits = collect_search_hits(&queries, &combined, &config);
     let touched: HashSet<_> = hits.iter().map(|hit| hit.target_index()).collect();
@@ -116,7 +117,7 @@ fn record_grouping_preserves_named_hits(#[values(1, 4, 7)] group_size: usize) {
 
     let mut grouped = Vec::new();
     for group in records.chunks(group_size) {
-        let part = TargetRegistry::build(group.to_vec(), Some(1)).unwrap();
+        let part = TargetRegistry::build(group.to_vec(), Some(NonZeroUsize::MIN)).unwrap();
         grouped.extend(hit_keys(
             collect_search_hits(&queries, &part, &config),
             &queries,
@@ -133,7 +134,8 @@ fn record_grouping_preserves_named_hits(#[values(1, 4, 7)] group_size: usize) {
 #[test]
 fn query_partitioning_preserves_named_hits() {
     let config = config();
-    let target = TargetRegistry::build(load_records(&data("target.fa")), Some(1)).unwrap();
+    let target =
+        TargetRegistry::build(load_records(&data("target.fa")), Some(NonZeroUsize::MIN)).unwrap();
     let all = load_queries(&data("query.fa"), &config);
     let combined_keys = hit_keys(collect_search_hits(&all, &target, &config), &all, &target);
     assert!(!combined_keys.is_empty(), "corpus must produce hits");
@@ -163,7 +165,8 @@ fn query_partitioning_preserves_named_hits() {
 fn stricter_cutoff_returns_exactly_the_eligible_hits(#[values(0.1, 0.5, 0.9)] quantile: f64) {
     let config = config();
     let queries = load_queries(&data("query.fa"), &config);
-    let target = TargetRegistry::build(load_records(&data("target.fa")), Some(1)).unwrap();
+    let target =
+        TargetRegistry::build(load_records(&data("target.fa")), Some(NonZeroUsize::MIN)).unwrap();
 
     let loose_hits = collect_search_hits(&queries, &target, &config);
     let mut energies: Vec<_> = loose_hits.iter().map(|hit| hit.energy).collect();
