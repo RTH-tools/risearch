@@ -1,0 +1,63 @@
+name: Docs
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build site
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: "0.12.18"
+
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v6
+
+      # The API reference is read from the generated stub.
+      - name: Generate type stub
+        working-directory: bindings/python
+        run: uv run --locked maturin generate-stubs --out .
+
+      - name: Build site
+        working-directory: bindings/python
+        run: uv run --locked --group docs zensical build --clean
+
+      - name: Upload site
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: bindings/python/site
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v5

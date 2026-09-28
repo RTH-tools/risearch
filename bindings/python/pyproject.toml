@@ -28,6 +28,7 @@ classifiers = [
 dependencies = ["polars>=1.43.2"]
 
 [project.urls]
+Documentation = "https://saiden89.github.io/risearch/"
 Repository = "https://github.com/saiden89/risearch"
 Issues = "https://github.com/saiden89/risearch/issues"
 
@@ -36,6 +37,7 @@ lts-cpu = ["polars[rtcompat]"]
 
 [dependency-groups]
 dev = ["pytest", "maturin", "ruff", "ty", "pyrefly"]
+docs = ["zensical", "mkdocstrings-python"]
 
 [tool.uv]
 package = false

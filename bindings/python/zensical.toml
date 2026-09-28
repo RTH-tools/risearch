@@ -1,0 +1,24 @@
+[project]
+site_name = "RIsearch for Python"
+site_description = "Fast RNA and DNA interaction search, returning Polars DataFrames"
+site_url = "https://saiden89.github.io/risearch/"
+repo_url = "https://github.com/saiden89/risearch"
+repo_name = "saiden89/risearch"
+nav = [
+  { "Overview" = "index.md" },
+  { "Guide" = "guide.md" },
+  { "API reference" = "api.md" },
+]
+
+[project.markdown_extensions.pymdownx.snippets]
+check_paths = true
+
+[project.plugins.mkdocstrings.handlers.python]
+paths = ["."]
+
+[project.plugins.mkdocstrings.handlers.python.options]
+docstring_style = "numpy"
+filters = "public"
+separate_signature = true
+show_root_heading = true
+show_signature_annotations = true

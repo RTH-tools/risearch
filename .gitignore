@@ -11,7 +11,7 @@ __pycache__/
 *.idx
 *.sh
 *.json
-docs/
+/docs/
 mutants.out/
 mutants.out.old/
 
@@ -23,6 +23,7 @@ dist/
 .mypy_cache/
 .ruff_cache/
 bindings/python/risearch/_native.pyi
+bindings/python/site/
 
 # Generated property failures are regression inputs, not disposable output.
 !proptest-regressions/**/*.txt
