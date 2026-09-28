@@ -79,6 +79,11 @@ version = "0.19.0"
 backend = "cargo:cargo-outdated"
 specifiers = ["latest"]
 
+[[tools."cargo:cargo-release"]]
+version = "1.1.6"
+backend = "cargo:cargo-release"
+specifiers = ["latest"]
+
 [[tools."cargo:cargo-semver-checks"]]
 version = "0.50.0"
 backend = "cargo:cargo-semver-checks"

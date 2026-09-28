@@ -28,6 +28,14 @@ include = [
   "/CITATION.cff",
 ]
 
+[package.metadata.release]
+publish = false
+pre-release-commit-message = "chore(release): prepare for v{{version}}"
+pre-release-hook = ["git-cliff", "--tag", "v{{version}}", "-o", "CHANGELOG.md"]
+pre-release-replacements = [
+  { file = "README.md", search = "risearch --version [0-9A-Za-z.+-]+", replace = "risearch --version {{version}}", exactly = 1, prerelease = true },
+]
+
 [features]
 default = ["cli", "mimalloc"]
 cli = ["dep:anyhow", "dep:clap", "dep:env_logger"]

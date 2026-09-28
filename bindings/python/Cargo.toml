@@ -16,6 +16,9 @@ include = [
     "/README.md",
 ]
 
+[package.metadata.release]
+release = false
+
 [lib]
 name = "_native"
 crate-type = ["cdylib"]
