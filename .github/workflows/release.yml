@@ -3,11 +3,6 @@ name: Release
 on:
   push:
     tags: ["v[0-9]*"]
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: Existing tag to publish to PyPI
-        required: true
 
 permissions:
   contents: write
@@ -15,7 +10,6 @@ permissions:
 jobs:
   changelog:
     name: Changelog
-    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -103,8 +97,6 @@ jobs:
     uses: ./.github/workflows/python-dist.yml
     permissions:
       contents: read
-    with:
-      ref: refs/tags/${{ inputs.tag || github.ref_name }}
 
   pypi:
     name: Publish to PyPI
