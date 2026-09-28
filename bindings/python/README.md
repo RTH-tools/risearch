@@ -20,7 +20,7 @@ pip install risearch
 ```
 
 or `uv add risearch`.
-Wheels are built for Linux x86_64 (manylinux) and macOS on Apple Silicon, for Python 3.10 and newer.
+Wheels are built for Linux x86_64 (manylinux) and macOS on Apple Silicon, for every supported Python version.
 On other platforms pip builds from the source distribution, which needs Rust 1.88 or newer.
 
 On older x86-64 CPUs, or x86-64 Python running under Rosetta, install the compatibility Polars runtime; the module is still imported as `polars`:

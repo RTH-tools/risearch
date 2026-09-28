@@ -4,8 +4,8 @@ act = "latest"
 rust = "latest"
 hk = "latest"
 uv = "latest"
-# Without pyo3/extension-module, pyo3 links libpython and enforces abi3-py310 against PATH python; macOS ships 3.9.
-python = "3.10"
+# pyo3 compiles cargo builds against this interpreter's limited API; keep it at the requires-python floor.
+python = "3.11"
 
 "cargo:cargo-deny" = "latest"
 "cargo:cargo-edit" = "latest"

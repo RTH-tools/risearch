@@ -57,7 +57,8 @@ Do not reach for `continue-on-error`: a job that reports green is a job nobody r
 The `test-python` job builds the extension with `maturin develop --generate-stubs` into the locked `uv` environment and runs the Python suite from `bindings/python/`.
 `--generate-stubs` writes `risearch/_native.pyi` from the compiled module; the stub is not committed, so ty and pyrefly run after that step, while ruff runs before it with `risearch` declared first-party.
 `uv sync` prunes packages it does not track, so it must run before `maturin develop`; `uv run` does not prune, so the suite step leaves the installed extension in place.
-The job pins CPython 3.10, the declared floor, because that is where the Python layer's syntax and typing assumptions break first — the `cp310-abi3` extension itself is identical on every supported interpreter.
+The job runs on the declared floor, read by uv from `bindings/python/.python-version`, because that is where the Python layer's syntax and typing assumptions break first — the `abi3` extension itself is identical on every supported interpreter.
+Bump that file and `requires-python` together when the floor moves.
 The Rust `test` job excludes `risearch-python`, so this is the only lane that exercises the binding.
 Its last step, `maturin build --sdist`, builds the source distribution and then a wheel from it, so a manifest or `include` list that breaks the sdist fails here.
 

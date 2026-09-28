@@ -41,11 +41,11 @@ This covers the Python API only: the CLI resolves some options its own way, so t
 Build a wheel:
 
 ```bash
-uv run --python 3.10 --locked maturin build --out ../../dist
+uv run --locked maturin build --out ../../dist
 ```
 
 Build the source distribution and verify it by rebuilding a wheel from the unpacked archive:
 
 ```bash
-uv run --python 3.10 --locked maturin build --sdist --out ../../dist
+uv run --locked maturin build --sdist --out ../../dist
 ```

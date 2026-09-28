@@ -208,7 +208,7 @@ jobs:
 
       - name: Sync Python environment
         working-directory: bindings/python
-        run: uv sync --locked --python 3.10
+        run: uv sync --locked
 
       - name: ruff check
         working-directory: bindings/python
