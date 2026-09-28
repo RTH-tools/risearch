@@ -15,22 +15,14 @@ use crate::seq::Sequence;
 pub fn read_sequences(filename: impl AsRef<Path>) -> Result<Vec<(String, Sequence)>> {
     let filename = filename.as_ref();
 
-    let md = fs_err::metadata(filename)?;
-    if md.is_dir() {
+    if fs_err::metadata(filename)?.is_dir() {
         return Err(Error::Input(format!(
             "Input path is not a file: {}",
             filename.display()
         )));
     }
-    if md.is_file() && md.len() == 0 {
-        return Err(Error::Input(format!(
-            "No sequences found in input file: {}",
-            filename.display()
-        )));
-    }
 
-    let file = fs_err::File::open(filename)
-        .map_err(|err| Error::Input(format!("Failed to open FASTA/FASTQ file: {err}")))?;
+    let file = fs_err::File::open(filename)?;
     read_sequences_from(file, &filename.display().to_string())
 }
 
