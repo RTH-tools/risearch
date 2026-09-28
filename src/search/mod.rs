@@ -431,7 +431,7 @@ mod tests {
         ExtendConfig, FilterConfig, OutputCompression, OutputConfig, OutputFormat, ScoreConfig,
         SeedConfig,
     };
-    use crate::fastx::read_sequences;
+    use crate::fastx::{read_sequences, read_sequences_from};
     use crate::index::store::TargetRegistry;
     use crate::output::TextSink;
     use crate::types::DsmId;
@@ -931,10 +931,10 @@ mod tests {
         max_extension: i32,
     ) -> std::result::Result<Vec<SearchHit>, String> {
         let cfg = config(max_extension);
-        let query_fa = fixture(&format!(">query\n{query}\n"));
         let (target_seq, _) = Sequence::normalize("target", target.as_bytes()).unwrap();
         let store = TargetRegistry::build(vec![("target".to_string(), target_seq)], None).unwrap();
-        let queries = read_sequences(query_fa.path()).unwrap();
+        let queries =
+            read_sequences_from(format!(">query\n{query}\n").as_bytes(), "inline").unwrap();
 
         let sink = VecSink::default();
         run_search(&queries, &store, &cfg, &sink).map_err(|e| e.to_string())?;
@@ -1047,9 +1047,8 @@ mod tests {
         config: &SearchConfig,
     ) -> Vec<SearchHit> {
         let (target, _) = Sequence::normalize("t", target_text.as_bytes()).unwrap();
-        let query_file = tempfile::NamedTempFile::new().unwrap();
-        std::fs::write(query_file.path(), format!(">q\n{query_text}\n")).unwrap();
-        let queries = read_sequences(query_file.path()).unwrap();
+        let queries =
+            read_sequences_from(format!(">q\n{query_text}\n").as_bytes(), "inline").unwrap();
         let targets = TargetRegistry::build(vec![("t".into(), target)], None).unwrap();
         super::collect_search_hits(&queries, &targets, config)
     }

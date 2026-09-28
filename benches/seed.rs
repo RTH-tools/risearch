@@ -2,20 +2,15 @@
 //!
 //! Run with: cargo bench --bench seed
 
-use std::fs;
-use std::path::Path;
-
 use std::hint::black_box;
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use risearch::config::SeedConfig;
-use risearch::fastx::read_sequences;
 use risearch::registry::QueryRegistry;
 use risearch::seed::{SeedHit, SeedingEngine};
 use risearch::seq::Sequence;
 use risearch::types::Base;
 use risearch::TargetRegistry;
-use tempfile::TempDir;
 
 struct SimpleLcg {
     state: u64,
@@ -45,7 +40,6 @@ impl SimpleLcg {
 }
 
 struct ProductionSeedDataset {
-    _tmpdir: TempDir,
     queries: QueryRegistry,
     store: TargetRegistry,
 }
@@ -56,39 +50,23 @@ fn generate_sequence(len: usize, seed: u64) -> Sequence {
     Sequence::from(bases)
 }
 
-fn write_fasta(path: &Path, prefix: &str, seqs: &[Sequence]) {
-    let mut buf = Vec::new();
-    for (idx, seq) in seqs.iter().enumerate() {
-        buf.extend_from_slice(format!(">{prefix}{idx}\n").as_bytes());
-        for &base in seq.iter() {
-            buf.push(base.to_u8_upper());
-        }
-        buf.push(b'\n');
-    }
-    fs::write(path, buf).expect("write FASTA");
-}
-
 fn build_production_dataset(
     query_count: usize,
     query_len: usize,
     target_len: usize,
     seed_config: &SeedConfig,
 ) -> ProductionSeedDataset {
-    let tmpdir = TempDir::new().expect("tempdir");
-    let queries_path = tmpdir.path().join("queries.fa");
-
-    let queries: Vec<_> = (0..query_count)
-        .map(|i| generate_sequence(query_len, 1_000 + i as u64))
+    let queries = (0..query_count)
+        .map(|i| {
+            (
+                format!("q{i}"),
+                generate_sequence(query_len, 1_000 + i as u64),
+            )
+        })
         .collect();
     let targets = [generate_sequence(target_len, 9_999)];
 
-    write_fasta(&queries_path, "q", &queries);
-
-    let queries = QueryRegistry::build(
-        read_sequences(&queries_path).expect("read queries"),
-        seed_config,
-    )
-    .expect("query registry");
+    let queries = QueryRegistry::build(queries, seed_config).expect("query registry");
     let named_targets = targets
         .iter()
         .enumerate()
@@ -96,11 +74,7 @@ fn build_production_dataset(
         .collect();
     let store = TargetRegistry::build(named_targets, None).expect("build target index");
 
-    ProductionSeedDataset {
-        _tmpdir: tmpdir,
-        queries,
-        store,
-    }
+    ProductionSeedDataset { queries, store }
 }
 
 fn seed_count(groups: &[(usize, Vec<SeedHit>)]) -> usize {

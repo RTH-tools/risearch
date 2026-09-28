@@ -224,7 +224,7 @@ impl QueryRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::fastx::read_sequences;
+    use crate::fastx::read_sequences_from;
 
     fn make_query_data(
         sequence: Sequence,
@@ -314,16 +314,12 @@ mod tests {
     }
 
     fn records(content: &str) -> Vec<(String, Sequence)> {
-        use std::io::Write;
-        let mut f = tempfile::NamedTempFile::new().unwrap();
-        f.write_all(content.as_bytes()).unwrap();
-        read_sequences(f.path()).unwrap()
+        read_sequences_from(content.as_bytes(), "inline").unwrap()
     }
 
     #[test]
-    fn build_preserves_order_across_concatenated_inputs() {
-        let mut queries = records(">alpha\nACGUACGU\n");
-        queries.extend(records(">beta\nUUUUAAAA\n>gamma\nGGGGCCCC\n"));
+    fn build_preserves_record_order() {
+        let queries = records(">alpha\nACGUACGU\n>beta\nUUUUAAAA\n>gamma\nGGGGCCCC\n");
 
         let registry = QueryRegistry::build(queries, &seed_config()).unwrap();
 
@@ -334,7 +330,7 @@ mod tests {
     }
 
     #[test]
-    fn build_rejects_duplicates_across_concatenated_inputs() {
+    fn build_rejects_duplicate_ids_across_inputs() {
         let mut queries = records(">seq1\nACGUACGU\n");
         queries.extend(records(">seq1\nUUUUAAAA\n"));
 

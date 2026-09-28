@@ -5,15 +5,11 @@
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
-use std::fs;
-use std::path::Path;
-
 use std::hint::black_box;
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use rayon::ThreadPoolBuilder;
 use risearch::config::{ExtendConfig, FilterConfig, ScoreConfig, SearchConfig, SeedConfig};
-use risearch::fastx::read_sequences;
 use risearch::registry::QueryRegistry;
 use risearch::search::run_search;
 use risearch::seed::SeedingEngine;
@@ -22,7 +18,6 @@ use risearch::types::{Base, DsmId, Strand};
 use risearch::Energy;
 use risearch::TargetRegistry;
 use risearch::VecSink;
-use tempfile::TempDir;
 
 struct SimpleLcg {
     state: u64,
@@ -52,7 +47,6 @@ impl SimpleLcg {
 }
 
 struct ProductionSearchDataset {
-    _tmpdir: TempDir,
     queries: Vec<(String, Sequence)>,
     store: TargetRegistry,
 }
@@ -63,26 +57,11 @@ fn generate_sequence(len: usize, seed: u64) -> Sequence {
     Sequence::from(bases)
 }
 
-fn write_fasta(path: &Path, prefix: &str, seqs: &[Sequence]) {
-    let mut buf = Vec::new();
-    for (idx, seq) in seqs.iter().enumerate() {
-        buf.extend_from_slice(format!(">{prefix}{idx}\n").as_bytes());
-        for &base in seq.iter() {
-            buf.push(base.to_u8_upper());
-        }
-        buf.push(b'\n');
-    }
-    fs::write(path, buf).expect("write FASTA");
-}
-
 fn build_production_dataset(
     query_count: usize,
     query_len: usize,
     target_len: usize,
 ) -> ProductionSearchDataset {
-    let tmpdir = TempDir::new().expect("tempdir");
-    let queries_path = tmpdir.path().join("queries.fa");
-
     let queries: Vec<_> = (0..query_count)
         .map(|i| generate_sequence(query_len, 1_000 + i as u64))
         .collect();
@@ -106,9 +85,11 @@ fn build_production_dataset(
     }
     let targets = targets.into_iter().map(Sequence::from).collect::<Vec<_>>();
 
-    write_fasta(&queries_path, "q", &queries);
-
-    let queries = read_sequences(&queries_path).expect("read queries");
+    let queries = queries
+        .into_iter()
+        .enumerate()
+        .map(|(idx, seq)| (format!("q{idx}"), seq))
+        .collect();
     let named_targets = targets
         .iter()
         .enumerate()
@@ -116,11 +97,7 @@ fn build_production_dataset(
         .collect();
     let store = TargetRegistry::build(named_targets, None).expect("build target index");
 
-    ProductionSearchDataset {
-        _tmpdir: tmpdir,
-        queries,
-        store,
-    }
+    ProductionSearchDataset { queries, store }
 }
 
 fn make_search_config(seed_config: &SeedConfig) -> SearchConfig {

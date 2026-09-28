@@ -8,7 +8,7 @@
 
 use std::ops::Range;
 
-use crate::fastx::read_sequences;
+use crate::fastx::read_sequences_from;
 use crate::registry::QueryRegistry;
 use crate::{Base, SeedConfig, Sequence, Strand, TargetRegistry};
 
@@ -136,10 +136,11 @@ fn assert_seeds_match_enumeration(
         .enumerate()
         .map(|(i, q)| format!(">q{i}\n{q}\n"))
         .collect::<String>();
-    let file = tempfile::NamedTempFile::new().unwrap();
-    std::fs::write(file.path(), fasta).unwrap();
-    let queries_registry =
-        QueryRegistry::build(read_sequences(file.path()).unwrap(), config).unwrap();
+    let queries_registry = QueryRegistry::build(
+        read_sequences_from(fasta.as_bytes(), "inline").unwrap(),
+        config,
+    )
+    .unwrap();
     let targets_registry = TargetRegistry::build(
         targets
             .iter()

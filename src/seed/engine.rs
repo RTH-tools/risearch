@@ -150,28 +150,29 @@ fn emit_seed_match<const WOBBLE: bool, F: FnMut(SeedHit)>(
 
 #[cfg(test)]
 mod tests {
-    use std::io::Write;
 
     use crate::config::SeedConfig;
-    use crate::fastx::read_sequences;
+    use crate::fastx::read_sequences_from;
     use crate::index::store::TargetRegistry;
     use crate::registry::QueryRegistry;
     use crate::types::Strand;
 
     use super::*;
 
-    fn build_store(fasta: &str) -> (TargetRegistry, tempfile::TempDir) {
-        let dir = tempfile::tempdir().unwrap();
-        let fasta_path = dir.path().join("targets.fa");
-        fs_err::write(&fasta_path, fasta).unwrap();
-        let targets = read_sequences(&fasta_path).unwrap();
-        (TargetRegistry::build(targets, None).unwrap(), dir)
+    fn build_store(fasta: &str) -> TargetRegistry {
+        TargetRegistry::build(
+            read_sequences_from(fasta.as_bytes(), "inline").unwrap(),
+            None,
+        )
+        .unwrap()
     }
 
     fn build_queries(fasta: &str, config: &SeedConfig) -> QueryRegistry {
-        let mut file = tempfile::NamedTempFile::new().unwrap();
-        file.write_all(fasta.as_bytes()).unwrap();
-        QueryRegistry::build(read_sequences(file.path()).unwrap(), config).unwrap()
+        QueryRegistry::build(
+            read_sequences_from(fasta.as_bytes(), "inline").unwrap(),
+            config,
+        )
+        .unwrap()
     }
 
     #[test]
@@ -185,7 +186,7 @@ mod tests {
             ..Default::default()
         };
         let queries = build_queries(">q1\nGGAC\n", &config);
-        let (targets, _dir) = build_store(">t1\nGU\n");
+        let targets = build_store(">t1\nGU\n");
 
         let groups = SeedingEngine::new(&queries, &targets).run(&config).unwrap();
         assert_eq!(groups.len(), 1);
@@ -210,7 +211,7 @@ mod tests {
             ..Default::default()
         };
         let queries = build_queries(">q1\nCG\n", &config);
-        let (targets, _dir) = build_store(">t1\nAACGU\n");
+        let targets = build_store(">t1\nAACGU\n");
 
         let groups = SeedingEngine::new(&queries, &targets).run(&config).unwrap();
         assert_eq!(groups.len(), 1);
