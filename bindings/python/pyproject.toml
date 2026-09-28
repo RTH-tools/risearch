@@ -6,10 +6,10 @@ build-backend = "maturin"
 name = "risearch"
 dynamic = ["version", "license"]
 requires-python = ">=3.10"
-description = "Python bindings for risearch"
+description = "Fast RNA and DNA interaction search, returning Polars DataFrames"
 readme = "README.md"
 authors = [{ name = "Stefano Roncelli", email = "stefano.roncelli@sund.ku.dk" }]
-keywords = ["RNA", "bioinformatics", "RNA-RNA interaction", "sequence-search", "suffix-array"]
+keywords = ["RNA", "DNA", "bioinformatics", "RNA-RNA interaction", "sequence-search", "suffix-array"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
@@ -28,9 +28,11 @@ classifiers = [
 dependencies = ["polars>=1.43.2"]
 
 [project.urls]
+Homepage = "https://github.com/saiden89/risearch"
 Documentation = "https://saiden89.github.io/risearch/"
 Repository = "https://github.com/saiden89/risearch"
 Issues = "https://github.com/saiden89/risearch/issues"
+Changelog = "https://github.com/saiden89/risearch/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 lts-cpu = ["polars[rtcompat]"]

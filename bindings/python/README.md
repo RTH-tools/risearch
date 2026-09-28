@@ -1,153 +1,79 @@
-# risearch Python bindings
+# RIsearch for Python
 
-## Quick start
+[![PyPI](https://img.shields.io/pypi/v/risearch)](https://pypi.org/project/risearch/)
+[![Python](https://img.shields.io/pypi/pyversions/risearch)](https://pypi.org/project/risearch/)
+[![CI](https://github.com/saiden89/risearch/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/saiden89/risearch/actions/workflows/ci.yml?query=branch%3Amain)
+[![License](https://img.shields.io/badge/license-BUSL--1.1-blue)](https://github.com/saiden89/risearch/blob/main/LICENSE)
+[![Docs](https://img.shields.io/badge/docs-online-blue)](https://saiden89.github.io/risearch/)
 
-From the repo root:
+RIsearch predicts RNA and DNA interactions: RNA-RNA, DNA-DNA and RNA-DNA hybrids.
+You give it query sequences, such as miRNAs or siRNAs, and a set of targets, such as a transcriptome.
+It reports every duplex whose predicted free energy is at or below a threshold, with coordinates, strand, energy and the pairing pattern, as a [Polars](https://pola.rs) DataFrame.
 
-```bash
-cd bindings/python
-uv sync --locked
-uv run --locked maturin develop
-uv run --locked python
-```
+This package wraps the same Rust library as the [`risearch` command-line tool](https://github.com/saiden89/risearch), a rewrite of [RIsearch2](https://doi.org/10.1093/nar/gkw1325).
+It is a pre-release: options and output may still change before 3.0.0.
 
-`uv` manages the locked development environment; Maturin builds and installs
-the local extension into that environment. Run `maturin develop` again after
-changing Rust binding code.
-
-Import the public package as `risearch`. The compiled module is installed as
-`risearch._native` and is a private implementation detail.
-
-This Python package does not install the `risearch` command-line program. From
-the repository root, install only the CLI with
-`cargo install --locked --path .`.
-
-## Legacy CPU / Rosetta install
-
-For older x86-64 CPUs or x86-64 Python running under Rosetta on Apple Silicon,
-install the compatibility Polars runtime through the `lts-cpu` extra:
+## Installation
 
 ```bash
-uv sync --locked --extra lts-cpu
-uv run --locked maturin develop
+pip install risearch
 ```
 
-For published wheels, the equivalent pip form is:
+or `uv add risearch`.
+Wheels are built for Linux x86_64 (manylinux) and macOS on Apple Silicon, for Python 3.10 and newer.
+On other platforms pip builds from the source distribution, which needs Rust 1.88 or newer.
+
+On older x86-64 CPUs, or x86-64 Python running under Rosetta, install the compatibility Polars runtime; the module is still imported as `polars`:
 
 ```bash
 pip install "risearch[lts-cpu]"
 ```
 
-This extra uses Polars' `rtcompat` runtime, so the Python module is still
-imported as `polars`.
+The package does not install the `risearch` command-line program; its [releases](https://github.com/saiden89/risearch/releases) ship prebuilt binaries.
 
-## What the binding exposes
-
-The Python package is very small:
-
-- `risearch.index(fasta, output, threads=None)` builds a binary target index
-  (`threads` needs the `openmp` build feature; wheels are single-threaded here)
-- `risearch.TargetRegistry.open(path)` opens that index for reuse
-- `risearch.search(query, target, **kwargs)` runs the search and returns a Polars `DataFrame`
-
-The result schema is:
-
-| Column | Polars type | Meaning |
-| --- | --- | --- |
-| `query_idx`, `target_idx` | `UInt64` | Registry positions |
-| `query_name`, `target_name` | `String` | FASTA identifiers |
-| `q_start`, `q_end`, `t_start`, `t_end` | `UInt64` | Zero-based, inclusive coordinates |
-| `strand` | `String` | `+` or `-` |
-| `energy` | `Float64` | Free energy in kcal/mol |
-| `alignment` | `String` (nullable) | Pairing fingerprint |
-
-The `search()` kwargs map to the canonical Rust-facing options:
-
-- `seed_length`, `seed_start`, `seed_end`
-- `mismatches`, `mismatch_prefix`, `mismatch_suffix`
-- `seed_wobble` (off by default; set `True` to allow G-U pairs in seeds)
-- `matrix` (bundled model id or path to a custom TSV table), `penalty`, `temperature`
-  (defaults to 37 °C; has no effect on a custom table, and a warning is logged if both are given)
-- `max_extension`
-- `energy_threshold`, `seed_energy`, `no_max_prune`, `no_dedup`
-- `alignment` — set `False` to skip DP traceback; the `alignment` column becomes all-null
-- `threads` — rayon worker width for query parsing and search; defaults to rayon's
-  choice, which honours `RAYON_NUM_THREADS`. Must be at least 1; `0` raises `ValueError`.
-
-## Logging
-
-Rust log records are forwarded into Python's `logging` under the `risearch`
-logger, so the application decides where they go:
+## Quick start
 
 ```python
-import logging
-
-logging.basicConfig(level=logging.INFO)
-```
-
-Unconfigured, Python's own fallback prints warnings to stderr. Silence the
-library with `logging.getLogger("risearch").setLevel(logging.ERROR)`.
-Configure logging before the first call: pyo3-log caches each module's
-effective level on first use, so later `setLevel` calls may not take effect.
-`TRACE` never reaches Python, and release wheels also drop `DEBUG`.
-
-## Where defaults live
-
-`risearch.search()` declares every default; the compiled `_native.search`
-declares none. `_native._default_options()` reports the Rust config defaults
-and the test suite holds the wrapper to them. This covers the Python API only
-— the CLI resolves some options its own way, so the two can still differ
-(`alignment` is one: the CLI derives it from the output format).
-
-## Smoke test
-
-Run this from `bindings/python/`:
-
-```bash
-uv run --locked python - <<'PY'
-from pathlib import Path
-import tempfile
 import risearch
 
-root = Path.cwd().parents[1]
-target_fa = root / "tests" / "data" / "target.fa"
-query_fa = root / "tests" / "data" / "query.fa"
+risearch.index("targets.fa", "targets.idx")  # build once
+targets = risearch.TargetRegistry.open("targets.idx")  # reuse for every search
 
-with tempfile.TemporaryDirectory() as tmp:
-    idx = Path(tmp) / "RHOC.idx"
-    risearch.index(target_fa, idx)
-    target = risearch.TargetRegistry.open(idx)
-    df = risearch.search(query_fa, target, seed_length=8, energy_threshold=-10.0)
-    print(df.shape)
-    print(df.columns)
-PY
+hits = risearch.search("mirnas.fa", targets)
 ```
 
-## Development check
+`hits` has one row per interaction.
+With the example in the repository, two human miRNAs against the 19 transcripts of RHOC in [`tests/data`](https://github.com/saiden89/risearch/tree/main/tests/data):
 
-Rust-side build check:
-
-```bash
-cargo test -p risearch-python
+```python
+>>> hits.sort("energy", "target_name", "t_start").select(
+...     "query_name", "target_name", "t_start", "t_end", "strand", "energy"
+... ).head(3)
+shape: (3, 6)
+┌────────────────────────────┬─────────────────────────────────┬─────────┬───────┬────────┬──────────┐
+│ query_name                 ┆ target_name                     ┆ t_start ┆ t_end ┆ strand ┆ energy   │
+│ ---                        ┆ ---                             ┆ ---     ┆ ---   ┆ ---    ┆ ---      │
+│ str                        ┆ str                             ┆ u64     ┆ u64   ┆ str    ┆ f64      │
+╞════════════════════════════╪═════════════════════════════════╪═════════╪═══════╪════════╪══════════╡
+│ hsa-miR-24-3p MIMAT0000080 ┆ ENSG00000155366|ENST00000527563 ┆ 481     ┆ 505   ┆ +      ┆ -25.3257 │
+│ hsa-miR-24-3p MIMAT0000080 ┆ ENSG00000155366|ENST00000285735 ┆ 305     ┆ 322   ┆ +      ┆ -23.0914 │
+│ hsa-miR-24-3p MIMAT0000080 ┆ ENSG00000155366|ENST00000285735 ┆ 1373    ┆ 1398  ┆ -      ┆ -21.7137 │
+└────────────────────────────┴─────────────────────────────────┴─────────┴───────┴────────┴──────────┘
 ```
 
-Build the extension and run the Python suite:
+Coordinates are 0-based and inclusive, unlike the 1-based CLI output.
+The row order can change from run to run, so sort when you need a stable order.
 
-```bash
-uv sync --locked
-uv run --locked maturin develop
-uv run --locked pytest -q
-```
+The [documentation](https://saiden89.github.io/risearch/) covers every function and option, the result columns, the energy models and logging.
 
-Build a wheel directly:
+## Citation
 
-```bash
-uv run --python 3.10 --locked maturin build --out ../../dist
-```
+If you use RIsearch, please cite:
 
-Build the source distribution and verify it by rebuilding a wheel from the
-unpacked archive:
+> Roncelli S, Favaro L, Anthon C, Gorodkin J.
+> RIsearch and RIOT: An integrated, high-performance framework for RNA-RNA interaction and siRNA off-target prediction.
+> *Bioinformatics*.
 
-```bash
-uv run --python 3.10 --locked maturin build --sdist --out ../../dist
-```
+## License
+
+[Business Source License 1.1](https://github.com/saiden89/risearch/blob/main/LICENSE).
