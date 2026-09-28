@@ -143,12 +143,7 @@ impl TryFrom<OutputArgs> for OutputConfig {
             (None, Some(fmt)) => {
                 warn!(
                     "Legacy -p/--report-alignment is deprecated; use --format {}.",
-                    match fmt {
-                        OutputFormat::Cigar => "cigar",
-                        OutputFormat::BindingSite => "bindingsite",
-                        OutputFormat::Minimal => "minimal",
-                        OutputFormat::Detailed => "detailed",
-                    }
+                    fmt.to_possible_value().unwrap().get_name()
                 );
                 fmt
             }
