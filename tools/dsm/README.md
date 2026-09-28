@@ -1,8 +1,7 @@
 # DSM table generator
 
 Generates dinucleotide stacking energy matrices (DSM) for risearch.
-Each table is a 36×36 matrix of nearest-neighbor thermodynamic parameters
-derived from ViennaRNA duplexfold energies via linear regression.
+Each table is a 36×36 matrix of nearest-neighbor thermodynamic parameters derived from ViennaRNA duplexfold energies via linear regression.
 
 ## Tables
 
@@ -37,8 +36,8 @@ Generate all 15 TSV tables:
 uv run python pipeline.py all
 ```
 
-Each TSV loads directly in risearch via `--matrix path/to/37.tsv`. `s95` tables load in
-RNA-query/DNA-target orientation; the transposed form exists only as the bundled `s95-dna-rna`.
+Each TSV loads directly in risearch via `--matrix path/to/37.tsv`.
+`s95` tables load in RNA-query/DNA-target orientation; the transposed form exists only as the bundled `s95-dna-rna`.
 
 Generate the Rust tables and their `mod.rs` for the runtime (writes to `../../src/dsm/tables/`):
 
@@ -60,8 +59,6 @@ uv run python pipeline.py one t04 37
 
 ## Notes
 
-- Tables are deterministic (seed 19328471) but differ from historical tables
-  due to ViennaRNA version differences and the s95 strand orientation fix
+- Tables are deterministic (seed 19328471) but differ from historical tables due to ViennaRNA version differences and the s95 strand orientation fix
 - The s95 orientation follows Sugimoto 1995: query = RNA strand, target = DNA strand
-- Generated Rust files are checked into `src/dsm/tables/` and should be
-  regenerated when pipeline parameters change
+- Generated Rust files are checked into `src/dsm/tables/` and should be regenerated when pipeline parameters change
