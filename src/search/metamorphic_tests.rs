@@ -13,7 +13,7 @@ use super::collect_search_hits;
 use super::tests::{data, fixture};
 use super::SearchHit;
 use crate::fastx::read_sequences;
-use crate::{Energy, QueryRegistry, SearchConfig, Sequence, TargetRegistry};
+use crate::{Energy, SearchConfig, Sequence, TargetRegistry};
 use std::collections::HashSet;
 use std::num::NonZeroUsize;
 use std::path::Path;
@@ -35,10 +35,6 @@ fn config() -> SearchConfig {
 
 fn load_records(path: &Path) -> Vec<(String, Sequence)> {
     read_sequences(path).unwrap()
-}
-
-fn load_queries(path: &Path, config: &SearchConfig) -> QueryRegistry {
-    QueryRegistry::from_fasta(path, &config.seed).unwrap()
 }
 
 fn single_records(text: &str) -> Vec<String> {
@@ -64,14 +60,14 @@ fn alignment_key(hit: &SearchHit) -> Option<String> {
     })
 }
 
-fn hit_key(hit: &SearchHit, queries: &QueryRegistry, targets: &TargetRegistry) -> String {
+fn hit_key(hit: &SearchHit, queries: &[(String, Sequence)], targets: &TargetRegistry) -> String {
     // Energy is integer-scaled internally.  Re-quantizing the public kcal/mol
     // value keeps this helper independent of the private representation while
     // retaining exact equality at the advertised precision.
     let energy = (hit.energy.to_kcal() * 10_000.0).round() as i64;
     format!(
         "{}\0{}\0{}:{}\0{}:{}\0{}\0{}\0{}",
-        queries.get_name(hit.query_idx as usize),
+        queries[hit.query_idx as usize].0,
         targets.get_name(hit.target_index()),
         hit.q_start,
         hit.q_end,
@@ -85,7 +81,7 @@ fn hit_key(hit: &SearchHit, queries: &QueryRegistry, targets: &TargetRegistry) -
 
 fn hit_keys(
     hits: Vec<SearchHit>,
-    queries: &QueryRegistry,
+    queries: &[(String, Sequence)],
     targets: &TargetRegistry,
 ) -> Vec<String> {
     let mut keys: Vec<_> = hits
@@ -103,7 +99,7 @@ fn hit_keys(
 #[rstest::rstest]
 fn record_grouping_preserves_named_hits(#[values(1, 4, 7)] group_size: usize) {
     let config = config();
-    let queries = load_queries(&data("query.fa"), &config);
+    let queries = load_records(&data("query.fa"));
     let records = load_records(&data("target.fa"));
     let combined = TargetRegistry::build(records.clone(), Some(NonZeroUsize::MIN)).unwrap();
 
@@ -136,13 +132,13 @@ fn query_partitioning_preserves_named_hits() {
     let config = config();
     let target =
         TargetRegistry::build(load_records(&data("target.fa")), Some(NonZeroUsize::MIN)).unwrap();
-    let all = load_queries(&data("query.fa"), &config);
+    let all = load_records(&data("query.fa"));
     let combined_keys = hit_keys(collect_search_hits(&all, &target, &config), &all, &target);
     assert!(!combined_keys.is_empty(), "corpus must produce hits");
 
     let mut split = Vec::new();
     for text in single_records(&fs_err::read_to_string(data("query.fa")).unwrap()) {
-        let one = load_queries(fixture(&text).path(), &config);
+        let one = load_records(fixture(&text).path());
         split.extend(hit_keys(
             collect_search_hits(&one, &target, &config),
             &one,
@@ -164,7 +160,7 @@ fn query_partitioning_preserves_named_hits() {
 #[rstest::rstest]
 fn stricter_cutoff_returns_exactly_the_eligible_hits(#[values(0.1, 0.5, 0.9)] quantile: f64) {
     let config = config();
-    let queries = load_queries(&data("query.fa"), &config);
+    let queries = load_records(&data("query.fa"));
     let target =
         TargetRegistry::build(load_records(&data("target.fa")), Some(NonZeroUsize::MIN)).unwrap();
 

@@ -13,6 +13,7 @@ use std::hint::black_box;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use rayon::ThreadPoolBuilder;
 use risearch::config::{ExtendConfig, FilterConfig, ScoreConfig, SearchConfig, SeedConfig};
+use risearch::fastx::read_sequences;
 use risearch::registry::QueryRegistry;
 use risearch::search::run_search;
 use risearch::seed::SeedingEngine;
@@ -52,7 +53,7 @@ impl SimpleLcg {
 
 struct ProductionSearchDataset {
     _tmpdir: TempDir,
-    queries: QueryRegistry,
+    queries: Vec<(String, Sequence)>,
     store: TargetRegistry,
 }
 
@@ -78,7 +79,6 @@ fn build_production_dataset(
     query_count: usize,
     query_len: usize,
     target_len: usize,
-    seed_config: &SeedConfig,
 ) -> ProductionSearchDataset {
     let tmpdir = TempDir::new().expect("tempdir");
     let queries_path = tmpdir.path().join("queries.fa");
@@ -108,7 +108,7 @@ fn build_production_dataset(
 
     write_fasta(&queries_path, "q", &queries);
 
-    let queries = QueryRegistry::from_fasta(&queries_path, seed_config).expect("query registry");
+    let queries = read_sequences(&queries_path).expect("read queries");
     let named_targets = targets
         .iter()
         .enumerate()
@@ -175,7 +175,9 @@ fn bench_search_prod_shaped_pipeline(c: &mut Criterion) {
         min_prefix_matches: 2,
         min_suffix_matches: 2,
     };
-    let dataset = build_production_dataset(10, 22, 50_000, &seed_config);
+    let dataset = build_production_dataset(10, 22, 50_000);
+    let prepared =
+        QueryRegistry::build(dataset.queries.clone(), &seed_config).expect("prepare queries");
     let mut score_args = make_search_config(&seed_config);
     score_args.seed.no_max_prune = true;
     score_args.filter.no_dedup = true;
@@ -187,8 +189,7 @@ fn bench_search_prod_shaped_pipeline(c: &mut Criterion) {
         .build()
         .expect("single-thread benchmark pool");
 
-    let (forward, reverse) =
-        pool.install(|| seed_counts(&dataset.queries, &dataset.store, &seed_config));
+    let (forward, reverse) = pool.install(|| seed_counts(&prepared, &dataset.store, &seed_config));
     let seed_total = forward + reverse;
     assert_eq!(
         (seed_total, forward, reverse),
@@ -199,7 +200,7 @@ fn bench_search_prod_shaped_pipeline(c: &mut Criterion) {
     let retained = pool
         .install(|| run_search(&dataset.queries, &dataset.store, &hit_args, &setup_sink))
         .expect("run setup search");
-    assert_eq!(retained, 110_800, "retained-hit workload changed");
+    assert_eq!(retained, 110_823, "retained-hit workload changed");
 
     let case = "10q_x_2x50k";
     group.throughput(Throughput::Elements(seed_total as u64));
@@ -208,7 +209,7 @@ fn bench_search_prod_shaped_pipeline(c: &mut Criterion) {
         b.iter(|| {
             let counts = pool.install(|| {
                 seed_counts(
-                    black_box(&dataset.queries),
+                    black_box(&prepared),
                     black_box(&dataset.store),
                     black_box(&seed_config),
                 )

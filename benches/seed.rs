@@ -9,6 +9,7 @@ use std::hint::black_box;
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use risearch::config::SeedConfig;
+use risearch::fastx::read_sequences;
 use risearch::registry::QueryRegistry;
 use risearch::seed::{SeedHit, SeedingEngine};
 use risearch::seq::Sequence;
@@ -83,7 +84,11 @@ fn build_production_dataset(
 
     write_fasta(&queries_path, "q", &queries);
 
-    let queries = QueryRegistry::from_fasta(&queries_path, seed_config).expect("query registry");
+    let queries = QueryRegistry::build(
+        read_sequences(&queries_path).expect("read queries"),
+        seed_config,
+    )
+    .expect("query registry");
     let named_targets = targets
         .iter()
         .enumerate()

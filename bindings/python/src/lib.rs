@@ -11,8 +11,8 @@ use pyo3::prelude::*;
 use pyo3::types::{PyCapsule, PyDict};
 use risearch::fastx::read_sequences;
 use risearch::{
-    run_search, DsmId, Energy, ExtendConfig, FilterConfig, QueryRegistry, ScoreConfig,
-    SearchConfig, SeedConfig, TargetRegistry,
+    run_search, DsmId, Energy, ExtendConfig, FilterConfig, ScoreConfig, SearchConfig, SeedConfig,
+    TargetRegistry,
 };
 
 use crate::arrow::{search_result_schema, ArrowSink};
@@ -257,8 +257,6 @@ fn search(
     };
     config.validate()?;
 
-    let paths: Vec<&std::path::Path> = query.iter().map(|p| p.as_path()).collect();
-
     let threads = thread_count(threads)?;
     // Scoped, not build_global: build_global errors on a second call. Detached
     // because building it spawns OS threads.
@@ -270,14 +268,16 @@ fn search(
         })
         .map_err(|err| SearchError::new_err(format!("failed to build the thread pool: {err}")))?;
 
-    // Detached: a rayon worker that logs deadlocks against a held GIL.
-    let queries = py.detach(|| {
-        in_pool(pool.as_ref(), || {
-            QueryRegistry::from_fastas(&paths, &config.seed)
-        })
+    let queries = py.detach(|| -> Result<Vec<_>> {
+        let mut records = Vec::new();
+        for path in &query {
+            records.extend(read_sequences(path)?);
+        }
+        Ok(records)
     })?;
 
     let sink = ArrowSink::new(&queries, &target.0);
+    // Detached: a rayon worker that logs deadlocks against a held GIL.
     py.detach(|| {
         in_pool(pool.as_ref(), || {
             run_search(&queries, &target.0, &config, &sink)

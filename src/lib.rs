@@ -21,10 +21,11 @@
 //! ```no_run
 //! use std::path::Path;
 //!
-//! use risearch::{run_search, QueryRegistry, SearchConfig, TargetRegistry, VecSink};
+//! use risearch::fastx::read_sequences;
+//! use risearch::{run_search, SearchConfig, TargetRegistry, VecSink};
 //!
 //! let opts = SearchConfig::default();
-//! let queries = QueryRegistry::from_fasta(Path::new("queries.fa"), &opts.seed)?;
+//! let queries = read_sequences(Path::new("queries.fa"))?;
 //! let targets = TargetRegistry::open(Path::new("targets.idx"))?;
 //!
 //! let sink = VecSink::default();
@@ -65,6 +66,7 @@ pub mod error;
 pub mod fastx;
 pub(crate) mod index;
 pub mod output;
+#[doc(hidden)]
 pub mod registry;
 pub mod search;
 #[doc(hidden)]
@@ -77,7 +79,6 @@ pub use alignment::{AlignColumn, PairClass};
 pub use error::{Error, Result};
 pub use index::store::TargetRegistry;
 pub use index::TargetView;
-pub use registry::QueryRegistry;
 pub use seq::Sequence;
 pub use types::{Base, Energy, Strand};
 

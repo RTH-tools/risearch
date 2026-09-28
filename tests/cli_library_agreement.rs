@@ -5,9 +5,9 @@
 #![cfg(feature = "cli")]
 
 use assert_cmd::cargo::cargo_bin_cmd;
-use risearch::{
-    run_search, Energy, QueryRegistry, SearchConfig, SearchHit, TargetRegistry, VecSink,
-};
+use risearch::fastx::read_sequences;
+use risearch::{run_search, Energy, SearchConfig, SearchHit, Sequence, TargetRegistry, VecSink};
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
@@ -33,7 +33,7 @@ fn config() -> SearchConfig {
 }
 
 fn collect(
-    query: &QueryRegistry,
+    query: &[(String, Sequence)],
     target: &TargetRegistry,
     config: &SearchConfig,
 ) -> Vec<SearchHit> {
@@ -76,19 +76,13 @@ fn build_cli_index(target: &Path, index: &Path) {
         .success();
 }
 
-#[test]
-fn cli_minimal_output_matches_library_hits() {
-    let query = fixture("query.fa");
-    let dir = TempDir::new().unwrap();
-    let index = dir.path().join("targets.idx");
-    build_cli_index(&fixture("target.fa"), &index);
-
-    let output = cargo_bin_cmd!("risearch")
-        .arg("search")
+fn cli_search_keys(query: &OsStr, index: &Path, stdin: Option<Vec<u8>>) -> Vec<String> {
+    let mut cmd = cargo_bin_cmd!("risearch");
+    cmd.arg("search")
         .arg("-q")
-        .arg(&query)
+        .arg(query)
         .arg("-t")
-        .arg(&index)
+        .arg(index)
         .arg("-o")
         .arg("-")
         .arg("--seed-length")
@@ -100,17 +94,26 @@ fn cli_minimal_output_matches_library_hits() {
         .arg("-e")
         .arg("-5.0")
         .arg("--format")
-        .arg("minimal")
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
-    let cli = minimal_cli_keys(std::str::from_utf8(&output).unwrap());
+        .arg("minimal");
+    if let Some(input) = stdin {
+        cmd.write_stdin(input);
+    }
+    let output = cmd.assert().success().get_output().stdout.clone();
+    minimal_cli_keys(std::str::from_utf8(&output).unwrap())
+}
+
+#[test]
+fn cli_minimal_output_matches_library_hits() {
+    let query = fixture("query.fa");
+    let dir = TempDir::new().unwrap();
+    let index = dir.path().join("targets.idx");
+    build_cli_index(&fixture("target.fa"), &index);
+
+    let cli = cli_search_keys(query.as_os_str(), &index, None);
     assert!(!cli.is_empty(), "CLI fixture must produce hits");
 
     let config = config();
-    let queries = QueryRegistry::from_fasta(&query, &config.seed).unwrap();
+    let queries = read_sequences(&query).unwrap();
     let targets = TargetRegistry::open(&index).unwrap();
     let mut library: Vec<_> = collect(&queries, &targets, &config)
         .into_iter()
@@ -119,7 +122,7 @@ fn cli_minimal_output_matches_library_hits() {
             let energy = (hit.energy.to_kcal() * 100.0).round_ties_even() as i64;
             format!(
                 "{}\0{}\0{}:{}\0{}:{}\0{}\0{}",
-                queries.get_name(hit.query_idx as usize),
+                queries[hit.query_idx as usize].0,
                 targets.get_name(hit.target_index()),
                 hit.q_start,
                 hit.q_end,
@@ -133,4 +136,31 @@ fn cli_minimal_output_matches_library_hits() {
     library.sort();
     assert!(!library.is_empty(), "library fixture must produce hits");
     assert_eq!(cli, library, "CLI and library disagree on minimal fixture");
+}
+
+#[test]
+fn cli_stdin_input_matches_file() {
+    let query = fixture("query.fa");
+    let dir = TempDir::new().unwrap();
+    let index = dir.path().join("targets.idx");
+    build_cli_index(&fixture("target.fa"), &index);
+
+    let stdin_index = dir.path().join("stdin.idx");
+    cargo_bin_cmd!("risearch")
+        .arg("index")
+        .arg("-")
+        .arg(&stdin_index)
+        .write_stdin(fs_err::read(fixture("target.fa")).unwrap())
+        .assert()
+        .success();
+    assert_eq!(
+        fs_err::read(&index).unwrap(),
+        fs_err::read(&stdin_index).unwrap(),
+        "stdin targets changed the index"
+    );
+
+    let from_file = cli_search_keys(query.as_os_str(), &index, None);
+    let from_stdin = cli_search_keys(OsStr::new("-"), &index, Some(fs_err::read(&query).unwrap()));
+    assert!(!from_file.is_empty(), "CLI fixture must produce hits");
+    assert_eq!(from_file, from_stdin, "stdin query changed the hits");
 }

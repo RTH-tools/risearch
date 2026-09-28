@@ -153,6 +153,7 @@ mod tests {
     use std::io::Write;
 
     use crate::config::SeedConfig;
+    use crate::fastx::read_sequences;
     use crate::index::store::TargetRegistry;
     use crate::registry::QueryRegistry;
     use crate::types::Strand;
@@ -163,14 +164,14 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let fasta_path = dir.path().join("targets.fa");
         fs_err::write(&fasta_path, fasta).unwrap();
-        let targets = crate::fastx::read_sequences(&fasta_path).unwrap();
+        let targets = read_sequences(&fasta_path).unwrap();
         (TargetRegistry::build(targets, None).unwrap(), dir)
     }
 
     fn build_queries(fasta: &str, config: &SeedConfig) -> QueryRegistry {
         let mut file = tempfile::NamedTempFile::new().unwrap();
         file.write_all(fasta.as_bytes()).unwrap();
-        QueryRegistry::from_fasta(file.path(), config).unwrap()
+        QueryRegistry::build(read_sequences(file.path()).unwrap(), config).unwrap()
     }
 
     #[test]

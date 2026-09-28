@@ -6,7 +6,7 @@ use arrow_array::builder::{Float64Builder, LargeStringBuilder, StringBuilder, UI
 use arrow_array::{ArrayRef, RecordBatch};
 use arrow_schema::{DataType, Field, Schema, SchemaRef};
 use risearch::alignment::fingerprint_symbols;
-use risearch::{HitSink, QueryRegistry, Result, SearchHit, TargetRegistry};
+use risearch::{HitSink, Result, SearchHit, Sequence, TargetRegistry};
 
 pub(crate) fn search_result_schema() -> &'static SchemaRef {
     static SCHEMA: OnceLock<SchemaRef> = OnceLock::new();
@@ -45,13 +45,13 @@ struct HitColumns {
 /// Appends each query's hits straight into the Arrow columns as that query
 /// finishes, so the full hit set is never materialized at once.
 pub(crate) struct ArrowSink<'a> {
-    queries: &'a QueryRegistry,
+    queries: &'a [(String, Sequence)],
     store: &'a TargetRegistry,
     columns: Mutex<HitColumns>,
 }
 
 impl<'a> ArrowSink<'a> {
-    pub(crate) fn new(queries: &'a QueryRegistry, store: &'a TargetRegistry) -> Self {
+    pub(crate) fn new(queries: &'a [(String, Sequence)], store: &'a TargetRegistry) -> Self {
         Self {
             queries,
             store,
@@ -90,7 +90,7 @@ impl HitSink for ArrowSink<'_> {
                     .map(|a| fingerprint_symbols(a).collect())
             })
             .collect();
-        let query_name = self.queries.get_name(query_idx);
+        let query_name = &self.queries[query_idx].0;
 
         let mut c = self.columns.lock().unwrap();
         for (h, alignment) in hits.iter().zip(&rendered) {

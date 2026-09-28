@@ -44,7 +44,7 @@ pub(crate) struct Cli {
 
 #[derive(clap::Args, Debug)]
 pub(crate) struct IndexCommand {
-    /// Input file in FASTA format.
+    /// Input file in FASTA format -- use '-' for stdin
     #[arg(value_name = "INPUT")]
     pub(crate) input: PathBuf,
 

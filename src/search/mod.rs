@@ -29,6 +29,7 @@ use crate::index::store::TargetRegistry;
 use crate::index::view::TargetView;
 use crate::registry::QueryRegistry;
 use crate::seed::{SeedHit, SeedingEngine};
+use crate::seq::Sequence;
 use crate::types::{Base, Energy, Strand};
 
 /// One accepted interaction: a span of a query paired against a span of a target.
@@ -38,15 +39,16 @@ use crate::types::{Base, Energy, Strand};
 /// search uses physical duplex views ordered 3'->5' alongside the 5'->3' query;
 /// that span is converted to FASTA coordinates once when the hit is assembled.
 ///
-/// Bases and names are not carried, only indices into the query and target
-/// registries. [`query`](Self::query) slices a supplied query sequence;
-/// [`target`](Self::target) resolves the paired span through a [`TargetView`].
+/// Bases and names are not carried, only indices into the queries passed to
+/// [`run_search`] and into the target registry. [`query`](Self::query) slices a
+/// supplied query sequence; [`target`](Self::target) resolves the paired span
+/// through a [`TargetView`].
 ///
 /// `alignment` is populated only under
 /// [`ExtendConfig::build_alignment`](crate::ExtendConfig).
 #[derive(Debug, Clone)]
 pub struct SearchHit {
-    /// Compact registry positions, checked when the hit is constructed.
+    /// Position in the queries passed to [`run_search`].
     pub query_idx: u32,
     /// Index into the target registry; see [`target_index`](Self::target_index).
     pub target_idx: u32,
@@ -175,28 +177,35 @@ fn dedup_hits(hits: Vec<SearchHit>) -> Vec<SearchHit> {
 /// `HashMap` order, so nothing about the output order is stable across runs. The
 /// hit *set* is. Callers needing an order must sort.
 ///
+/// `queries` are `(name, sequence)` records, e.g. from
+/// [`read_sequences`](crate::fastx::read_sequences), which guarantees what is
+/// required here: at least one record, and every sequence non-empty. They are
+/// prepared against `opts.seed` here, and duplicate names are rejected. The `query_idx` a sink
+/// receives, like [`SearchHit::query_idx`], is a position in `queries`.
+///
 /// The config is validated before any query runs, so a sink that defers touching
 /// its destination until first use will not have disturbed it if this returns an
 /// error.
 pub fn run_search(
-    queries: &QueryRegistry,
+    queries: &[(String, Sequence)],
     store: &TargetRegistry,
     opts: &SearchConfig,
     sink: &dyn HitSink,
 ) -> Result<usize> {
     opts.validate()?;
 
-    if store.is_empty() || queries.is_empty() {
-        // Deliberately not flushed: an empty store or query set leaves the
-        // destination untouched, where a zero-hit run truncates it.
+    let queries = QueryRegistry::build(queries.to_vec(), &opts.seed)?;
+    // Deliberately not flushed: an empty store leaves the destination
+    // untouched, where a zero-hit run truncates it.
+    if store.is_empty() {
         return Ok(0);
     }
 
-    check_unlimited_fits(queries, opts)?;
-    log_search_banner(queries, store, opts);
+    check_unlimited_fits(&queries, opts)?;
+    log_search_banner(&queries, store, opts);
 
     let ctx = SearchContext {
-        queries,
+        queries: &queries,
         store,
         opts,
         model: ScoringModel::load(
@@ -404,7 +413,7 @@ impl SearchHit {
 /// Run the production search and collect its hits without depending on text output.
 #[cfg(test)]
 pub(crate) fn collect_search_hits(
-    queries: &crate::QueryRegistry,
+    queries: &[(String, Sequence)],
     targets: &crate::TargetRegistry,
     config: &crate::SearchConfig,
 ) -> Vec<SearchHit> {
@@ -422,9 +431,9 @@ mod tests {
         ExtendConfig, FilterConfig, OutputCompression, OutputConfig, OutputFormat, ScoreConfig,
         SeedConfig,
     };
+    use crate::fastx::read_sequences;
     use crate::index::store::TargetRegistry;
     use crate::output::TextSink;
-    use crate::registry::QueryRegistry;
     use crate::types::DsmId;
     use crate::{Sequence, VecSink};
 
@@ -489,7 +498,7 @@ mod tests {
 
     fn build_store(target_fa: &std::path::Path) -> (TargetRegistry, tempfile::TempDir) {
         let tmpdir = tempfile::tempdir().unwrap();
-        let targets = crate::fastx::read_sequences(target_fa).unwrap();
+        let targets = read_sequences(target_fa).unwrap();
         let store = TargetRegistry::build(targets, None).unwrap();
         (store, tmpdir)
     }
@@ -502,7 +511,7 @@ mod tests {
         // Mirror what the CLI derives for Minimal, so this also covers dedup's
         // empty-fingerprint (first-wins) tie-break.
         config.extend.build_alignment = false;
-        let queries = QueryRegistry::from_fasta(&data("query.fa"), &config.seed).unwrap();
+        let queries = read_sequences(data("query.fa")).unwrap();
 
         let out = tempfile::NamedTempFile::with_suffix(".tsv").unwrap();
         let hits = run_to_path(&queries, &store, &config, &output, out.path());
@@ -531,7 +540,7 @@ mod tests {
             },
             ..test_config()
         };
-        let queries = QueryRegistry::from_fasta(&data("query.fa"), &config.seed).unwrap();
+        let queries = read_sequences(data("query.fa")).unwrap();
         let hits = run_search(&queries, &store, &config, &VecSink::default()).unwrap();
 
         assert_eq!(hits, 0, "no hits expected against a non-matching target");
@@ -541,7 +550,7 @@ mod tests {
     fn run_search_validates_configs_constructed_without_clap() {
         let (store, _tmp) = build_store(&data("target.fa"));
         let mut config = test_config();
-        let queries = QueryRegistry::from_fasta(&data("query.fa"), &config.seed).unwrap();
+        let queries = read_sequences(data("query.fa")).unwrap();
 
         config.score.penalty = Energy::from_kcal(-0.1);
         let err = run_search(&queries, &store, &config, &VecSink::default()).unwrap_err();
@@ -565,7 +574,7 @@ mod tests {
         let mut config = test_config();
         config.filter.delta_g = Energy::from_kcal(-100.0);
         let mut output = test_output();
-        let queries = QueryRegistry::from_fasta(&data("query.fa"), &config.seed).unwrap();
+        let queries = read_sequences(data("query.fa")).unwrap();
 
         let out = tempfile::NamedTempFile::with_suffix(".tsv").unwrap();
         fs_err::write(out.path(), b"stale").unwrap();
@@ -636,7 +645,7 @@ mod tests {
             multifile: true,
             ..test_output()
         };
-        let queries = QueryRegistry::from_fasta(query_f.path(), &config.seed).unwrap();
+        let queries = read_sequences(query_f.path()).unwrap();
 
         let tmp = tempfile::tempdir().unwrap();
         let dir = tmp.path().join("multi");
@@ -663,7 +672,7 @@ mod tests {
         config.extend.max_extension = 0;
         config.seed.seed_length = Some(4);
         config.filter.delta_g = Energy::from_kcal(100.0);
-        let queries = QueryRegistry::from_fasta(query_f.path(), &config.seed).unwrap();
+        let queries = read_sequences(query_f.path()).unwrap();
 
         let run_with_workers = |workers: usize| {
             let dir = tempfile::tempdir().unwrap();
@@ -742,7 +751,7 @@ mod tests {
     /// returning the hit count. The sink dies here, so the caller reads a file
     /// whose compression trailer is already written.
     fn run_to_path(
-        queries: &QueryRegistry,
+        queries: &[(String, Sequence)],
         store: &TargetRegistry,
         config: &SearchConfig,
         output: &OutputConfig,
@@ -754,7 +763,7 @@ mod tests {
 
     fn run_to_lines(
         config: &SearchConfig,
-        queries: &QueryRegistry,
+        queries: &[(String, Sequence)],
         store: &TargetRegistry,
     ) -> Vec<String> {
         let out = tempfile::NamedTempFile::with_suffix(".tsv").unwrap();
@@ -777,7 +786,7 @@ mod tests {
     fn mm2_minimal_fixture() -> (
         TargetRegistry,
         tempfile::TempDir,
-        QueryRegistry,
+        Vec<(String, Sequence)>,
         SearchConfig,
     ) {
         let (store, tmp) = build_store(&data("target.fa"));
@@ -791,7 +800,7 @@ mod tests {
         config.extend.max_extension = 30;
         config.score.penalty = Energy::from_kcal(0.0);
         config.filter.delta_g = Energy::from_kcal(-5.0);
-        let queries = QueryRegistry::from_fasta(&data("query.fa"), &config.seed).unwrap();
+        let queries = read_sequences(data("query.fa")).unwrap();
         (store, tmp, queries, config)
     }
 
@@ -925,7 +934,7 @@ mod tests {
         let query_fa = fixture(&format!(">query\n{query}\n"));
         let (target_seq, _) = Sequence::normalize("target", target.as_bytes()).unwrap();
         let store = TargetRegistry::build(vec![("target".to_string(), target_seq)], None).unwrap();
-        let queries = QueryRegistry::from_fasta(query_fa.path(), &cfg.seed).unwrap();
+        let queries = read_sequences(query_fa.path()).unwrap();
 
         let sink = VecSink::default();
         run_search(&queries, &store, &cfg, &sink).map_err(|e| e.to_string())?;
@@ -1040,7 +1049,7 @@ mod tests {
         let (target, _) = Sequence::normalize("t", target_text.as_bytes()).unwrap();
         let query_file = tempfile::NamedTempFile::new().unwrap();
         std::fs::write(query_file.path(), format!(">q\n{query_text}\n")).unwrap();
-        let queries = QueryRegistry::from_fasta(query_file.path(), &config.seed).unwrap();
+        let queries = read_sequences(query_file.path()).unwrap();
         let targets = TargetRegistry::build(vec![("t".into(), target)], None).unwrap();
         super::collect_search_hits(&queries, &targets, config)
     }

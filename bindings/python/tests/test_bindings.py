@@ -570,6 +570,12 @@ def test_missing_query_file_raises_file_not_found(store):
         risearch.search("no-such-query.fa", store)
 
 
+def test_empty_query_list_raises_input_error(store):
+    """An empty query list is an error, not an empty result."""
+    with pytest.raises(risearch.InputError):
+        risearch.search([], store)
+
+
 @pytest.mark.parametrize(
     "contents,reason",
     [

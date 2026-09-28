@@ -1,5 +1,6 @@
 //! Application entry point - handles CLI dispatch and orchestration.
 
+use std::io;
 use std::num::NonZeroUsize;
 use std::path::Path;
 
@@ -7,8 +8,8 @@ use anyhow::{Context, Result};
 use log::{debug, info, trace, warn};
 
 use crate::cli::args::validate_output_parent;
-use risearch::fastx::read_sequences;
-use risearch::{output, search, QueryRegistry, TargetRegistry};
+use risearch::fastx::{read_sequences, read_sequences_from};
+use risearch::{output, search, Sequence, TargetRegistry};
 
 use crate::cli::{Cli, Commands, SearchArgs};
 
@@ -32,7 +33,7 @@ pub(crate) fn run(cli: Cli) -> Result<()> {
 fn cmd_index(input: &Path, output: &Path, threads: Option<NonZeroUsize>) -> Result<()> {
     info!("Creating index: {:?} -> {:?}", input, output);
     validate_output_parent(output)?;
-    let targets = read_sequences(input).context("Failed to read targets")?;
+    let targets = read_input(input).context("Failed to read targets")?;
     let index = TargetRegistry::build(targets, threads).context("Failed to build index")?;
     index.save(output).context("Failed to write index file")?;
     info!("Index saved to {:?}", output);
@@ -51,8 +52,13 @@ fn cmd_search(cmd: &SearchArgs) -> Result<()> {
     }
 
     debug!("Loading queries from {:?}", query_path);
-    let queries =
-        QueryRegistry::from_fasta(query_path, &opts.seed).context("Failed to load queries")?;
+    let queries = read_input(query_path).context("Failed to load queries")?;
+    for (id, sequence) in &queries {
+        opts.seed
+            .resolve(sequence.len())
+            .with_context(|| format!("Invalid seed spec for query '{id}'"))
+            .context("Failed to load queries")?;
+    }
     info!("Loaded {} queries", queries.len());
 
     debug!("Loading target index from {:?}", target_path);
@@ -65,6 +71,15 @@ fn cmd_search(cmd: &SearchArgs) -> Result<()> {
     search::run_search(&queries, &targets, &opts, &sink)?;
     info!("Done");
     Ok(())
+}
+
+fn read_input(path: &Path) -> Result<Vec<(String, Sequence)>> {
+    let records = if path == Path::new("-") {
+        read_sequences_from(io::stdin(), "<stdin>")?
+    } else {
+        read_sequences(path)?
+    };
+    Ok(records)
 }
 
 // =============================================================================

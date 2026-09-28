@@ -8,8 +8,8 @@ use crate::config::{OutputConfig, OutputFormat};
 use crate::index::store::TargetRegistry;
 use crate::output::format::format_hit_into;
 use crate::output::writer::{build_multifile_paths, OutputWriter};
-use crate::registry::QueryRegistry;
 use crate::search::{HitSink, SearchHit};
+use crate::seq::Sequence;
 
 /// Turns each query's hits into text rows.
 ///
@@ -21,7 +21,7 @@ use crate::search::{HitSink, SearchHit};
 /// gzip and zstd write their trailer when the writer drops, so drop the sink only
 /// after the search returns.
 pub struct TextSink<'a> {
-    queries: &'a QueryRegistry,
+    queries: &'a [(String, Sequence)],
     store: &'a TargetRegistry,
     format: OutputFormat,
     out: OutputWriter,
@@ -30,12 +30,12 @@ pub struct TextSink<'a> {
 impl<'a> TextSink<'a> {
     /// `output_path` is a file, or a directory when `output.multifile` is set.
     ///
-    /// `queries` and `store` must be the same registries later passed to
+    /// `queries` and `store` must be the ones later passed to
     /// [`run_search`](crate::run_search): `consume` indexes them by the driver's
     /// `query_idx`, so a different pair silently attributes rows to the wrong
     /// sequences.
     pub fn new(
-        queries: &'a QueryRegistry,
+        queries: &'a [(String, Sequence)],
         store: &'a TargetRegistry,
         output: &OutputConfig,
         output_path: &Path,
@@ -44,7 +44,7 @@ impl<'a> TextSink<'a> {
             // Named up front so a `_1` collision suffix never depends on the order
             // queries finish in.
             let paths = build_multifile_paths(
-                (0..queries.len()).map(|i| queries.get_name(i)),
+                queries.iter().map(|(name, _)| name.as_str()),
                 output_path,
                 output.compress.extension(),
             );
@@ -67,7 +67,7 @@ impl HitSink for TextSink<'_> {
         if hits.is_empty() {
             return Ok(());
         }
-        let q_name = self.queries.get_name(query_idx);
+        let q_name = &self.queries[query_idx].0;
 
         // Loop-invariant: rebuilding it per hit re-enters the rkyv root.
         let tview = self.store.view();

@@ -8,7 +8,9 @@
 
 use std::ops::Range;
 
-use crate::{Base, QueryRegistry, SeedConfig, Sequence, Strand, TargetRegistry};
+use crate::fastx::read_sequences;
+use crate::registry::QueryRegistry;
+use crate::{Base, SeedConfig, Sequence, Strand, TargetRegistry};
 
 /// Arrange a normalized FASTA target in physical duplex-column order.
 ///
@@ -136,7 +138,8 @@ fn assert_seeds_match_enumeration(
         .collect::<String>();
     let file = tempfile::NamedTempFile::new().unwrap();
     std::fs::write(file.path(), fasta).unwrap();
-    let queries_registry = QueryRegistry::from_fasta(file.path(), config).unwrap();
+    let queries_registry =
+        QueryRegistry::build(read_sequences(file.path()).unwrap(), config).unwrap();
     let targets_registry = TargetRegistry::build(
         targets
             .iter()
