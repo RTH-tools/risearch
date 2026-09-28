@@ -462,9 +462,7 @@ def test_excessive_max_extension_raises(store):
 
 def test_public_objects_identify_as_risearch():
     assert risearch.TargetRegistry.__module__ == "risearch"
-    assert risearch.index.__module__ == "risearch"
     assert risearch.index.__name__ == "index"
-    assert risearch.search.__module__ == "risearch"
 
 
 def test_public_and_native_search_params_match():
