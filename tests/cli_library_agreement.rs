@@ -2,6 +2,7 @@
 //!
 //! Output order is deliberately unspecified, so both sides are reduced to a
 //! sorted named hit key before comparison.
+#![cfg(feature = "cli")]
 
 use assert_cmd::cargo::cargo_bin_cmd;
 use risearch::{
