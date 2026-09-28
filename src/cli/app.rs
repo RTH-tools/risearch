@@ -48,7 +48,7 @@ fn cmd_search(cmd: &SearchArgs) -> Result<()> {
     // Deprecation warnings for the other legacy flags are emitted during conversion.
     let (opts, output) = cmd.clone().try_into_configs()?;
     if cmd.input.uses_legacy_target() {
-        warn!("'-i' is deprecated; use -t/--target instead.");
+        warn!("Legacy -i/--index is deprecated and will be removed in a future release; use -t/--target.");
     }
 
     debug!("Loading queries from {:?}", query_path);

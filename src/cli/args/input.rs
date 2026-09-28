@@ -11,7 +11,7 @@ pub(crate) struct InputArgs {
         short = 't',
         long = "target",
         value_name = "TARGET",
-        required_unless_present = "legacy_target",
+        required = true,
         conflicts_with = "legacy_target"
     )]
     pub(crate) target: Option<PathBuf>,
@@ -19,9 +19,9 @@ pub(crate) struct InputArgs {
     /// DEPRECATED: legacy alias for -t/--target
     #[arg(
         short = 'i',
+        long = "index",
         value_name = "TARGET",
         hide = true,
-        required_unless_present = "target",
         conflicts_with = "target"
     )]
     pub(crate) legacy_target: Option<PathBuf>,
