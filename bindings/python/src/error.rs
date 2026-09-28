@@ -1,5 +1,5 @@
-//! Python exception classes, and the wrapper that carries an [`Error`] across the
-//! FFI boundary.
+//! The wrapper that carries an [`Error`] across the FFI boundary as a built-in
+//! Python exception.
 //!
 //! `PyErr` and [`Error`] are both foreign here, so the orphan rule blocks
 //! `impl From<Error> for PyErr`. [`PyRisearchError`] owns that conversion instead:
@@ -7,41 +7,10 @@
 //! because it converts back into `PyErr`.
 
 use pyo3::exceptions::{
-    PyException, PyFileNotFoundError, PyOSError, PyPermissionError, PyValueError,
+    PyFileNotFoundError, PyOSError, PyPermissionError, PyRuntimeError, PyValueError,
 };
-use pyo3::{create_exception, PyErr};
+use pyo3::PyErr;
 use risearch::Error;
-
-create_exception!(
-    risearch,
-    RisearchError,
-    PyException,
-    "Base class for every risearch-specific exception."
-);
-create_exception!(
-    risearch,
-    IndexFormatError,
-    RisearchError,
-    "A target index file this build cannot read."
-);
-create_exception!(
-    risearch,
-    ModelError,
-    RisearchError,
-    "A bundled energy model that could not be selected or parsed."
-);
-create_exception!(
-    risearch,
-    InputError,
-    RisearchError,
-    "Query or target input that cannot be searched."
-);
-create_exception!(
-    risearch,
-    SearchError,
-    RisearchError,
-    "A search that cannot proceed as configured."
-);
 
 /// A `PyErr` in transit, convertible from either error type `?` can encounter.
 pub struct PyRisearchError(PyErr);
@@ -55,13 +24,12 @@ impl From<Error> for PyRisearchError {
                 std::io::ErrorKind::PermissionDenied => PyPermissionError::new_err(msg),
                 _ => PyOSError::new_err(msg),
             },
-            Error::Index(_) => IndexFormatError::new_err(msg),
-            Error::Dsm(_) => ModelError::new_err(msg),
-            Error::Input(_) => InputError::new_err(msg),
-            Error::Config(_) => PyValueError::new_err(msg),
+            Error::Index(_) | Error::Dsm(_) | Error::Input(_) | Error::Config(_) => {
+                PyValueError::new_err(msg)
+            }
             Error::Output(_) => PyOSError::new_err(msg),
             // `Error` is #[non_exhaustive]: a variant added upstream lands here.
-            _ => RisearchError::new_err(msg),
+            _ => PyRuntimeError::new_err(msg),
         })
     }
 }

@@ -51,6 +51,9 @@ target-version = "py310"
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
 
+[tool.ruff.lint.isort]
+known-first-party = ["risearch"]
+
 [tool.ty.src]
 include = ["risearch"]
 
@@ -62,6 +65,7 @@ environment = { LZMA_API_STATIC = "1" }
 
 [tool.cibuildwheel]
 build-frontend = "build[uv]"
+config-settings = { build-args = "--generate-stubs" }
 build = ["cp*-manylinux_*", "cp*-macosx_arm64"]
 skip = "cp*t-*"
 test-skip = "cp315-*"  # polars 1.44 Series methods return None on 3.15rc: pola-rs/polars#29419

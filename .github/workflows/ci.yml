@@ -218,6 +218,18 @@ jobs:
         working-directory: bindings/python
         run: uv run --locked ruff format --check .
 
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
+
+      - name: Build CLI for Python cross-checks
+        run: cargo build --locked --bin risearch
+
+      # uv sync already ran above; maturin develop adds the native extension
+      # and writes its type stub, which ty and pyrefly read.
+      - name: Build extension and type stub into the locked environment
+        working-directory: bindings/python
+        run: uv run --locked maturin develop --generate-stubs
+
       - name: ty
         working-directory: bindings/python
         run: uv run --locked ty check .
@@ -225,17 +237,6 @@ jobs:
       - name: pyrefly
         working-directory: bindings/python
         run: uv run --locked pyrefly check .
-
-      - name: Setup Rust
-        uses: ./.github/actions/setup-rust
-
-      - name: Build CLI for Python cross-checks
-        run: cargo build --locked --bin risearch
-
-      # uv sync already ran above; maturin develop adds the native extension.
-      - name: Build extension into the locked environment
-        working-directory: bindings/python
-        run: uv run --locked maturin develop
 
       - name: Run Python suite
         working-directory: bindings/python

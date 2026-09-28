@@ -444,7 +444,7 @@ def test_invalid_matrix_raises(store, caplog):
     """An unknown id fails validation without first being warned about as a table."""
     with (
         caplog.at_level(logging.WARNING, logger="risearch"),
-        pytest.raises(risearch.ModelError, match="DSM id"),
+        pytest.raises(ValueError, match="DSM id"),
     ):
         risearch.search(QUERY_FA, store, matrix="t05", temperature=50)
     assert not [r for r in caplog.records if "temperature" in r.getMessage()]
@@ -538,29 +538,17 @@ def test_explicit_temperature_with_custom_table_warns(store, tmp_path, caplog):
 # ---------------------------------------------------------------------------
 
 
-def test_risearch_exceptions_share_a_base():
-    """One `except risearch.RisearchError` catches every risearch-specific error."""
-    for exc in (
-        risearch.IndexFormatError,
-        risearch.InputError,
-        risearch.ModelError,
-        risearch.SearchError,
-    ):
-        assert issubclass(exc, risearch.RisearchError)
-        assert issubclass(exc, Exception)
-
-
 def test_missing_index_raises_file_not_found(tmp_path):
     """An absent index is an OS-level miss, not a risearch-specific failure."""
     with pytest.raises(FileNotFoundError):
         risearch.TargetRegistry.open(tmp_path / "absent.idx")
 
 
-def test_corrupt_index_raises_index_format_error(tmp_path):
+def test_corrupt_index_raises_value_error(tmp_path):
     """A file that is not an index is rejected by the header, before the archive."""
     bogus = tmp_path / "bogus.idx"
     bogus.write_bytes(b"definitely not a risearch index")
-    with pytest.raises(risearch.IndexFormatError):
+    with pytest.raises(ValueError):
         risearch.TargetRegistry.open(bogus)
 
 
@@ -570,9 +558,9 @@ def test_missing_query_file_raises_file_not_found(store):
         risearch.search("no-such-query.fa", store)
 
 
-def test_empty_query_list_raises_input_error(store):
+def test_empty_query_list_raises_value_error(store):
     """An empty query list is an error, not an empty result."""
-    with pytest.raises(risearch.InputError):
+    with pytest.raises(ValueError):
         risearch.search([], store)
 
 
@@ -585,13 +573,13 @@ def test_empty_query_list_raises_input_error(store):
     ],
 )
 @pytest.mark.parametrize("operation", ["index", "search"])
-def test_invalid_sequence_input_raises_input_error(
+def test_invalid_sequence_input_raises_value_error(
     store, tmp_path, contents, reason, operation
 ):
-    """Bad biological input has a specific exception at both public entry points."""
+    """Bad biological input raises ValueError at both public entry points."""
     source = tmp_path / "invalid.fastx"
     source.write_text(contents)
-    with pytest.raises(risearch.InputError, match=reason):
+    with pytest.raises(ValueError, match=reason):
         if operation == "index":
             risearch.index(source, tmp_path / "invalid.idx")
         else:

@@ -16,7 +16,7 @@ use risearch::{
 };
 
 use crate::arrow::{search_result_schema, ArrowSink};
-use crate::error::{IndexFormatError, InputError, ModelError, Result, RisearchError, SearchError};
+use crate::error::Result;
 
 // =============================================================================
 // PySearchResult — Arrow C Stream Interface producer
@@ -46,7 +46,8 @@ impl PySearchResult {
     /// Arrow PyCapsule Interface producer (`__arrow_c_stream__` protocol).
     ///
     /// Called automatically by `pl.DataFrame(result)` — do not call directly.
-    #[pyo3(signature = (requested_schema = None))]
+    // `-> "object"`: the inferred `types.CapsuleType` needs Python 3.13.
+    #[pyo3(signature = (requested_schema = None) -> "object")]
     fn __arrow_c_stream__<'py>(
         &mut self,
         py: Python<'py>,
@@ -266,7 +267,11 @@ fn search(
                 .map(|n| rayon::ThreadPoolBuilder::new().num_threads(n.get()).build())
                 .transpose()
         })
-        .map_err(|err| SearchError::new_err(format!("failed to build the thread pool: {err}")))?;
+        .map_err(|err| {
+            pyo3::exceptions::PyRuntimeError::new_err(format!(
+                "failed to build the thread pool: {err}"
+            ))
+        })?;
 
     let queries = py.detach(|| -> Result<Vec<_>> {
         let mut records = Vec::new();
@@ -323,20 +328,19 @@ fn _default_options(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
     Ok(d)
 }
 
+// Inline, not a function: stub generation only introspects inline modules.
 #[pymodule]
-fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    // try_init, not init: init panics when another extension already installed
-    // a logger, and this body re-runs on module reload.
-    let _ = pyo3_log::try_init();
-    m.add("RisearchError", m.py().get_type::<RisearchError>())?;
-    m.add("IndexFormatError", m.py().get_type::<IndexFormatError>())?;
-    m.add("ModelError", m.py().get_type::<ModelError>())?;
-    m.add("InputError", m.py().get_type::<InputError>())?;
-    m.add("SearchError", m.py().get_type::<SearchError>())?;
-    m.add_class::<PyTargetRegistry>()?;
-    m.add_class::<PySearchResult>()?;
-    m.add_function(wrap_pyfunction!(build_index, m)?)?;
-    m.add_function(wrap_pyfunction!(search, m)?)?;
-    m.add_function(wrap_pyfunction!(_default_options, m)?)?;
-    Ok(())
+mod _native {
+    use pyo3::prelude::*;
+
+    #[pymodule_export]
+    use super::{_default_options, build_index, search, PySearchResult, PyTargetRegistry};
+
+    #[pymodule_init]
+    fn init(_m: &Bound<'_, PyModule>) -> PyResult<()> {
+        // try_init, not init: init panics when another extension already installed
+        // a logger, and this body re-runs on module reload.
+        let _ = pyo3_log::try_init();
+        Ok(())
+    }
 }

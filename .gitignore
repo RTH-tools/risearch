@@ -22,6 +22,7 @@ dist/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+bindings/python/risearch/_native.pyi
 
 # Generated property failures are regression inputs, not disposable output.
 !proptest-regressions/**/*.txt

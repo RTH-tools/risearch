@@ -7,14 +7,7 @@ from os import PathLike
 
 import polars as pl
 
-from ._native import (
-    IndexFormatError,
-    InputError,
-    ModelError,
-    RisearchError,
-    SearchError,
-    TargetRegistry,
-)
+from ._native import TargetRegistry
 from ._native import build_index as _build_index
 from ._native import search as _native_search
 
@@ -87,11 +80,6 @@ def search(
 
 
 __all__ = [
-    "IndexFormatError",
-    "InputError",
-    "ModelError",
-    "RisearchError",
-    "SearchError",
     "TargetRegistry",
     "index",
     "search",
