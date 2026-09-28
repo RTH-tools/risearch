@@ -1,0 +1,79 @@
+name: Python distributions
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: Git ref to build; empty builds the triggering ref
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  wheels:
+    name: Wheels ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, label: "Linux" }
+          - { os: macos-latest,  label: "macOS" }
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.ref }}
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: "0.12.18"
+
+      - name: Setup Rust
+        if: runner.os == 'macOS'
+        uses: ./.github/actions/setup-rust
+
+      - name: Build and test wheels
+        uses: pypa/cibuildwheel@e090b81e30c4d855ea63bf4b6e59204c09a101ae # v4.2.1
+        with:
+          package-dir: bindings/python
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v7
+        with:
+          name: python-wheels-${{ matrix.label }}
+          path: wheelhouse/*.whl
+
+  sdist:
+    name: Source distribution
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.ref }}
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: "0.12.18"
+
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
+
+      - name: Build sdist
+        working-directory: bindings/python
+        run: uv run --locked maturin sdist -o dist
+
+      - name: Upload sdist
+        uses: actions/upload-artifact@v7
+        with:
+          name: python-sdist
+          path: bindings/python/dist/*.tar.gz

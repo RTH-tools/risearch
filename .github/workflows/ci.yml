@@ -247,31 +247,5 @@ jobs:
         run: uv run --locked maturin build --sdist -o "${{ runner.temp }}/sdist-check"
 
   packaging:
-    name: Packaging ${{ matrix.label }}
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { os: ubuntu-latest, label: "Linux" }
-          - { os: macos-latest,  label: "macOS" }
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
-        with:
-          version: "0.12.18"
-
-      - name: Setup Rust
-        if: runner.os == 'macOS'
-        uses: ./.github/actions/setup-rust
-
-      - name: Build and test wheels
-        uses: pypa/cibuildwheel@e090b81e30c4d855ea63bf4b6e59204c09a101ae # v4.2.1
-        with:
-          package-dir: bindings/python
+    name: Packaging
+    uses: ./.github/workflows/python-dist.yml

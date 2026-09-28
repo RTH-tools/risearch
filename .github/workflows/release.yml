@@ -3,6 +3,11 @@ name: Release
 on:
   push:
     tags: ["v[0-9]*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to publish to PyPI
+        required: true
 
 permissions:
   contents: write
@@ -10,6 +15,7 @@ permissions:
 jobs:
   changelog:
     name: Changelog
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -65,3 +71,56 @@ jobs:
           locked: true
           checksum: sha256
           include: LICENSE,README.md
+
+  crates-io:
+    name: Publish to crates.io
+    needs: binaries
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
+
+      - name: Authenticate with crates.io
+        uses: rust-lang/crates-io-auth-action@c6f97d42243bad5fab37ca0427f495c86d5b1a18 # v1.0.5
+        id: auth
+
+      - name: Publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+        run: cargo publish --locked -p risearch
+
+  python-dist:
+    name: Python distributions
+    uses: ./.github/workflows/python-dist.yml
+    permissions:
+      contents: read
+    with:
+      ref: refs/tags/${{ inputs.tag || github.ref_name }}
+
+  pypi:
+    name: Publish to PyPI
+    needs: python-dist
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - name: Download distributions
+        uses: actions/download-artifact@v8
+        with:
+          pattern: python-*
+          path: dist
+          merge-multiple: true
+
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
