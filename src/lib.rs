@@ -49,7 +49,7 @@
 //!
 //! Index construction is parallel only through OpenMP (the `openmp` feature);
 //! its thread count is the `threads` argument of [`TargetRegistry::build`].
-//! Everything else parallel — query loading, index validation, search — runs
+//! Everything else parallel — query preparation, index validation, search — runs
 //! on the caller's rayon pool: the global pool, or the one entered with
 //! [`rayon::ThreadPool::install`]. The library never creates or configures a
 //! pool.

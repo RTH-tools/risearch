@@ -1,8 +1,8 @@
-//! Loaded queries and the name/index bookkeeping shared with the target store.
+//! Queries prepared for search.
 //!
-//! [`QueryRegistry`] is built once from FASTA against a [`SeedConfig`], so each
-//! [`Query`] arrives with its seed interval, length bounds, and N-prefix already
-//! resolved.
+//! [`QueryRegistry`] is built once from normalized records against a
+//! [`SeedConfig`], so each [`Query`] arrives with its seed interval, length
+//! bounds, and N-prefix already resolved.
 
 use crate::error::{Error, Result};
 use rayon::prelude::*;
@@ -194,8 +194,8 @@ impl QueryRegistry {
     /// Prepare queries from normalized records against `config`; this is what
     /// [`run_search`](crate::run_search) does with its `queries`.
     ///
-    /// Record order is kept and duplicate IDs are rejected. Query SA
-    /// construction is parallelised via rayon.
+    /// Record order is kept and duplicate IDs are rejected. Seed intervals and
+    /// N-prefix sums are resolved in parallel via rayon.
     pub fn build(queries: Vec<(String, Sequence)>, config: &SeedConfig) -> Result<Self> {
         if queries.is_empty() {
             return Err(Error::Input("No query sequences provided".into()));
