@@ -24,7 +24,7 @@ Prebuilt binaries for Linux (x86_64, aarch64) and macOS (Apple Silicon, Intel) a
 Or build it with Cargo (Rust 1.88 or newer):
 
 ```bash
-cargo install --locked risearch
+cargo install --locked risearch --version 3.0.0-alpha.4
 ```
 
 Add `--features openmp` to let `risearch index` build the suffix array on several threads.

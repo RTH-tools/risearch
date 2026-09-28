@@ -1,3 +1,49 @@
+## [3.0.0-alpha.4] - 2026-09-28
+
+### 🐛 Bug Fixes
+
+- *(build)* Gate the CLI agreement test in its file ([6f7ac31](https://github.com/saiden89/risearch/commit/6f7ac3151dc1479b5c53eadd4333500c67217e12))
+- *(fastx)* Keep I/O error kinds; let needletail report empty input ([7a0bdf2](https://github.com/saiden89/risearch/commit/7a0bdf244dfabed828884f617a24e37d2a32a887))
+
+### 📚 Documentation
+
+- Fix thread and registry doc comments ([08d6b9b](https://github.com/saiden89/risearch/commit/08d6b9bc02bee164dc6e6943b34ab25bcc935fed))
+- *(python)* Numpy docstrings for the public API ([b66006d](https://github.com/saiden89/risearch/commit/b66006dc35055655054fbf353ea1b8ac42dd7e65))
+- *(python)* API site with Zensical on GitHub Pages ([cc53019](https://github.com/saiden89/risearch/commit/cc530190b978d76ca7e3e85ab0886818775c2342))
+- *(python)* PyPI README and development notes ([48094c7](https://github.com/saiden89/risearch/commit/48094c74e6f18125e4acbf99dd4ed3f8de178103))
+- *(ci)* Describe the Python lanes; one sentence per line ([f90ace1](https://github.com/saiden89/risearch/commit/f90ace1b2b9acf6fd72ee62c0a4cc5849cadb89d))
+- Rewrite README for the release ([2cf8a5f](https://github.com/saiden89/risearch/commit/2cf8a5f5228c868d54e1b9afb6ddaf3bfee98dfa))
+
+### 🚜 Refactor
+
+- *(cli)* [**breaking**] Move the CLI out of the library behind a `cli` feature ([692f6dc](https://github.com/saiden89/risearch/commit/692f6dc88b60e66be0cfe590cf4ee3a5ba3ed621))
+- [**breaking**] Make thread counts non-zero and document the two runtimes ([8d08428](https://github.com/saiden89/risearch/commit/8d08428d5628f7844f84edd4b49c4166a6ccdfab))
+- [**breaking**] Search takes query records; read stdin in the CLI ([ece89a1](https://github.com/saiden89/risearch/commit/ece89a148cd2a0fa7d9652da08f94f334a185003))
+- *(registry)* Drop name lookups the sinks no longer use ([76da3c2](https://github.com/saiden89/risearch/commit/76da3c24740311e02fdf9061dbef0fd9fcab0d76))
+- *(cli)* Name the deprecated -p format from clap ([697f92e](https://github.com/saiden89/risearch/commit/697f92ecf812c315eb238a56bd7b98f639535df1))
+- *(python)* [**breaking**] Raise built-in exceptions; generate the type stub ([d9621d8](https://github.com/saiden89/risearch/commit/d9621d844b42b8593fb361c469292c995fddfe15))
+- *(python)* Move index() and search() into risearch._api ([6ea5a5b](https://github.com/saiden89/risearch/commit/6ea5a5b157028927c0ea4262a5f707ae01763524))
+
+### 🧪 Testing
+
+- Build fixtures from in-memory records ([1863e13](https://github.com/saiden89/risearch/commit/1863e131b11a9e5d9c9c163ddb5d5cb3e459846a))
+
+### ⚙️ Miscellaneous Tasks
+
+- Install uv 0.12.18 to match mise.lock ([26ad4fe](https://github.com/saiden89/risearch/commit/26ad4fed78dc7d09e50e885249ac1d0d4396360e))
+- *(release)* Publish musl and macOS binaries ([5457472](https://github.com/saiden89/risearch/commit/545747270dbe989fd00485c60795b3ad3f3b2f25))
+- *(release)* Drop manual dispatch after alpha.3 backfill ([d6c25e5](https://github.com/saiden89/risearch/commit/d6c25e5878c44fd7e9802636038c0f83996145d1))
+- *(dependabot)* Group arrow crates into one update ([f0afd9b](https://github.com/saiden89/risearch/commit/f0afd9b2fce9cbf9ba125da95ff214d47d9083bc))
+- Use all runner cores in verification tests; bump rust-cache ([ca83800](https://github.com/saiden89/risearch/commit/ca838000e831d846f749508e2ee83caa576d6c20))
+
+### 💼 Other
+
+- *(deps)* Bump rstest from 0.26.1 to 0.27.0 (#25) ([79374c7](https://github.com/saiden89/risearch/commit/79374c7f2ecef0c908ca9b33d5548f251eda945a))
+- *(deps)* Bump the actions-all group across 1 directory with 2 updates (#31) ([5383e8a](https://github.com/saiden89/risearch/commit/5383e8a26a1b96387c1b58e02132cad88ded6ea1))
+- *(deps)* Bump the cargo-minor-patch group across 1 directory with 2 updates (#35) ([a58a29c](https://github.com/saiden89/risearch/commit/a58a29c83f0b4b45b17d8e10f20dca6bc510d38a))
+- *(deps)* Bump arrow-array and arrow-schema to 60.0.0 ([07f0e7d](https://github.com/saiden89/risearch/commit/07f0e7dcb1d48e60376c22b416fff5af4c1d7d45))
+- *(deps)* Bump taiki-e/install-action in the actions-all group (#36) ([d2cfc10](https://github.com/saiden89/risearch/commit/d2cfc104dca2e33ee5328d03cc1f83c67daa518d))
+- *(deps-dev)* Bump the uv-minor-patch group (#37) ([b92308a](https://github.com/saiden89/risearch/commit/b92308a4eaa057edcf287118a849e90949b46c14))
 ## [3.0.0-alpha.3] - 2026-09-24
 
 ### 🚀 Features
