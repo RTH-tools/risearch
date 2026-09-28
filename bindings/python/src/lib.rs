@@ -70,9 +70,9 @@ impl PySearchResult {
 // PyTargetRegistry
 // =============================================================================
 
-/// An mmap-backed target index for RNA-RNA interaction search.
+/// An mmap-backed target index for interaction search.
 ///
-/// Build once with `build_index()`, then reuse across many `search()` calls.
+/// Build once with `risearch.index()`, then reuse across many `search()` calls.
 #[pyclass(name = "TargetRegistry", module = "risearch")]
 pub struct PyTargetRegistry(TargetRegistry);
 
@@ -83,7 +83,14 @@ impl PyTargetRegistry {
     /// Parameters
     /// ----------
     /// path : str | os.PathLike
-    ///     Path to the `.idx` file produced by `build_index()`.
+    ///     Path to the `.idx` file produced by `risearch.index()`.
+    ///
+    /// Raises
+    /// ------
+    /// FileNotFoundError
+    ///     No file at `path`.
+    /// ValueError
+    ///     The file is not an index this version can read.
     #[staticmethod]
     fn open(py: Python<'_>, path: PathBuf) -> Result<Self> {
         // Archive validation is rayon-parallel: a worker that logs deadlocks if
@@ -156,7 +163,7 @@ fn build_index(
     Ok(())
 }
 
-/// Search for RNA-RNA interactions between query sequences and an indexed target set.
+/// Search for interactions between query sequences and an indexed target set.
 ///
 /// Parameters
 /// ----------
