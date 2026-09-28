@@ -1,326 +1,152 @@
-# RIsearch (Rust)
+# RIsearch
 
-![Version](https://img.shields.io/badge/version-3.0.0--alpha.1-blue)
-![Build](https://img.shields.io/badge/build-cargo%20check%20passing-brightgreen)
-![License](https://img.shields.io/badge/license-GPLv3-blue)
-![MSRV](https://img.shields.io/badge/MSRV-not%20pinned-lightgrey)
+[![CI](https://github.com/saiden89/risearch/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/saiden89/risearch/actions/workflows/ci.yml?query=branch%3Amain)
+[![Release](https://img.shields.io/github/v/release/saiden89/risearch?include_prereleases&sort=semver)](https://github.com/saiden89/risearch/releases)
+[![License](https://img.shields.io/badge/license-BUSL--1.1-blue)](LICENSE)
+[![Rust](https://img.shields.io/badge/rust-1.88%2B-orange)](https://www.rust-lang.org)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue)](bindings/python)
 
-RIsearch predicts RNA-RNA interactions using a suffix-array seed search and
-energy-based extension model.
+RIsearch predicts RNA and DNA interactions: RNA-RNA, DNA-DNA and RNA-DNA hybrids.
+You give it query sequences, such as miRNAs or siRNAs, and a set of targets, such as a transcriptome.
+It reports every duplex whose predicted free energy is at or below a threshold, with coordinates, strand, energy and optionally the full alignment.
 
-This repository is the Rust port of RIsearch2. The CLI/library retains migration
-support for legacy workflows.
+The targets are indexed once into a suffix array.
+A search looks up short complementary seeds in that index and extends each one in both directions with a dynamic-programming alignment scored by nearest-neighbour stacking energies.
 
-## Quick Nav
-
-- [RIsearch (Rust)](#risearch-rust)
-  - [Quick Nav](#quick-nav)
-  - [Why RIsearch](#why-risearch)
-  - [Workflow](#workflow)
-  - [Status](#status)
-  - [Installation](#installation)
-  - [Quickstart](#quickstart)
-  - [Core Commands](#core-commands)
-  - [Common Recipes](#common-recipes)
-  - [Compatibility and Migration](#compatibility-and-migration)
-  - [Performance and Parallelism](#performance-and-parallelism)
-    - [OpenMP Profile for Faster Index Builds](#openmp-profile-for-faster-index-builds)
-  - [Troubleshooting and FAQ](#troubleshooting-and-faq)
-    - [OpenMP build fails with `omp.h file not found`](#openmp-build-fails-with-omph-file-not-found)
-    - [Why are thread counts different between `index` and `search`?](#why-are-thread-counts-different-between-index-and-search)
-    - [I still use `-s`, `-m`, or `-p` and see warnings](#i-still-use--s--m-or--p-and-see-warnings)
-    - [Search returned no hits](#search-returned-no-hits)
-  - [Developer Validation](#developer-validation)
-  - [Further Documentation](#further-documentation)
-  - [License](#license)
-
-## Why RIsearch
-
-- Fast suffix-array indexing and seed search for RNA-RNA interaction discovery.
-- Energy-based extension model with practical filters for production pipelines.
-- Modern CLI with streaming output, multiple formats, and gzip/zstd compression.
-- Legacy compatibility path for teams migrating from `risearch2` flags/workflows.
-
-## Workflow
-
-```mermaid
-flowchart LR
-  A["Target FASTA/FASTQ"] --> B["risearch index"]
-  B --> C["target.idx"]
-  D["Query FASTA or FASTA.gz"] --> E["risearch search"]
-  C --> E
-  E --> F["Seed generation and lookup"]
-  F --> G["Energy scoring and DP extension"]
-  G --> H["Output: detailed, cigar, bindingsite, minimal"]
-```
-
-## Status
-
-`risearch` is currently **alpha** (`3.0.0-alpha.1`). Core `index`/`search`
-workflows are active and tested, while some legacy compatibility flags remain
-deprecated and scheduled for removal.
+Version 3 is a rewrite of [RIsearch2](https://doi.org/10.1093/nar/gkw1325) in Rust, with Python bindings.
+It is a pre-release.
+Options and output may still change before 3.0.0.
 
 ## Installation
 
-Need Cargo? Install Rust (includes `cargo`) via https://rustup.rs/
+Prebuilt binaries for Linux (x86_64, aarch64) and macOS (Apple Silicon, Intel) are attached to every [release](https://github.com/saiden89/risearch/releases), each with a SHA-256 checksum.
 
-### Command-line interface
-
-Build the CLI from this checkout:
+Or build it with Cargo (Rust 1.88 or newer):
 
 ```bash
-cargo build --release
+cargo install --locked risearch
 ```
 
-Install only the CLI from this checkout:
+Add `--features openmp` to let `risearch index` build the suffix array on several threads.
+This needs an OpenMP runtime the C compiler can find.
+On macOS that means installing `libomp` and making it visible to the compiler and linker.
+
+## Quick start
+
+The repository includes a small example: two human miRNAs, miR-24-3p and miR-876-5p, as queries and the 19 transcripts of RHOC as targets.
 
 ```bash
-cargo install --locked --path .
+risearch index tests/data/target.fa target.idx
+risearch search -q tests/data/query.fa -t target.idx -o hits.tsv
 ```
 
-Sanity check:
-
-```bash
-risearch --help
-```
-
-This does not build or install the Python bindings.
-
-### Python bindings
-
-The Python package is maintained independently under
-[`bindings/python`](bindings/python/README.md). For a development installation:
-
-```bash
-cd bindings/python
-uv sync --locked
-uv run --locked maturin develop
-uv run --locked pytest -q
-```
-
-Python users import the public `risearch` package. Its compiled
-`risearch._native` extension is private implementation detail; the Python
-package does not install the `risearch` CLI.
-
-If you have not installed the binary yet, use `cargo run --release -- ...` in
-the examples below.
-
-## Quickstart
-
-```bash
-# Build index from target sequences
-risearch index target.fa target.idx
-
-# Run interaction search
-risearch search \
-  -q query.fa \
-  -t target.idx \
-  --seed-length 6 \
-  -l 20 \
-  -e -20 \
-  --format detailed \
-  -o results.tsv
-
-# Optional: compressed output
-risearch search -q query.fa -t target.idx --format minimal -o results.tsv.gz
-```
-
-## Core Commands
+`hits.tsv` holds one tab-separated line per interaction:
 
 ```text
-risearch index <INPUT> <OUTPUT>
-risearch search -q <QUERY_FASTA(.gz)> -t <TARGET_INDEX> [OPTIONS]
+hsa-miR-24-3p MIMAT0000080	2	22	ENSG00000155366|ENST00000285735	306	323	+	-23.09
+hsa-miR-24-3p MIMAT0000080	1	22	ENSG00000155366|ENST00000285735	1374	1399	-	-21.71
+hsa-miR-24-3p MIMAT0000080	1	22	ENSG00000155366|ENST00000369642	528	553	-	-21.71
 ```
 
-- `index`: build an index from target FASTA/FASTQ input.
-- `search`: run seed-and-extend search for one or more query sequences.
+The columns are query name, query start and end, target name, target start and end, strand, and free energy in kcal/mol.
+Coordinates are 1-based and inclusive, and target coordinates always refer to the target as written in the FASTA file.
+The order of hits can change from run to run, so sort the output if you need a stable order.
 
-Global flags:
+`risearch index --help` and `risearch search --help` list every option.
 
-- `-j, --jobs <N>`: worker threads (defaults to detected CPU parallelism).
-- `-v/-vv/-vvv`: increase log verbosity.
+## Input
 
-Run `risearch --help`, `risearch index --help`, and `risearch search --help`
-for the full and current option surface.
+`risearch index` reads target sequences from FASTA, plain or gzip-compressed.
+`risearch search` reads queries from FASTA, plain or gzip-compressed.
+Either input can be `-` to read from stdin.
+T and U are treated as the same base, so DNA and RNA input give the same result.
 
-## Common Recipes
+Index files record their format version.
+If a release changes the format, `search` stops with an error naming the file, and you rebuild it with `risearch index`.
+Indexes built by RIsearch2 cannot be read.
 
-Use modern long-form flags in new scripts and pipelines.
+## Output formats
 
-Select seed interval and length:
+Choose a format with `-f/--format`.
 
-```bash
-risearch search \
-  -q query.fa \
-  -t target.idx \
-  --seed-start 1 \
-  --seed-end 20 \
-  --seed-length 7
+| Format | Columns after the 8 standard ones |
+| --- | --- |
+| `minimal` (default) | none |
+| `cigar` | pairing string |
+| `bindingsite` | pairing string, aligned target, 5' and 3' target flanks (up to 20 nt each) |
+| `detailed` | none, but each hit is preceded by a three-line alignment |
+
+The pairing string has one character per alignment column, following the query 5' to 3':
+
+| Code | Meaning |
+| --- | --- |
+| `P` | Watson-Crick pair (A-U, C-G) |
+| `W` | G-U wobble pair |
+| `U` | mismatch |
+| `T` | extra base on the target side (gap in the query) |
+| `Q` | extra base on the query side (gap in the target) |
+
+In `detailed` output the query is on top (5' to 3'), the target underneath (3' to 5'), and the middle row marks Watson-Crick pairs with `|` and wobble pairs with `:`:
+
+```text
+uggcucaguu-----cagcaggaacag
+|||||| ||      |||||||  |||
+accgagacacccugugucgucc-cguc
+hsa-miR-24-3p MIMAT0000080	1	22	ENSG00000155366|ENST00000369642	528	553	-	-21.71
 ```
 
-Allow mismatches with explicit constraints:
+Output goes to stdout unless you pass `-o`.
+A file name ending in `.gz` or `.zst` is compressed with gzip or zstd.
 
-```bash
-risearch search \
-  -q query.fa \
-  -t target.idx \
-  --mismatch-max 1 \
-  --mismatch-prefix 3 \
-  --mismatch-suffix 3
-```
+## Energy models
 
-Enable seed wobble (off by default):
+| Model | Parameters | Query / target |
+| --- | --- | --- |
+| `t04` | Turner 2004 | RNA / RNA |
+| `slh04` | SantaLucia and Hicks 2004 | DNA / DNA |
+| `s95-rna-dna` | Sugimoto 1995 | RNA / DNA |
+| `s95-dna-rna` | Sugimoto 1995 | DNA / RNA |
 
-```bash
-risearch search -q query.fa -t target.idx --seed-wobble
-```
-
-Output formats:
-
-- `--format detailed`
-- `--format cigar`
-- `--format bindingsite`
-- `--format minimal` (default)
-
-Compression and multifile output:
-
-```bash
-risearch search \
-  -q queries.fa \
-  -t target.idx \
-  --format minimal \
-  --compress zstd \
-  --compress-level 6 \
-  --multifile \
-  -o out_dir
-```
-
-Tuning and filtering:
-
-- `-z, --matrix <MATRIX>` energy model: bundled id (`t04` default, `slh04`, `s95-rna-dna`, `s95-dna-rna`) or path to a custom TSV table (see [Custom energy tables](#custom-energy-tables)).
-- `-d, --penalty <kcal/mol>` per-nucleotide penalty.
-- `-l, --extension <L>` max extension around seed.
-- `-e, --energy <dG>` filter by deltaG threshold.
-- `--seed-energy <threshold>` seed-level energy filter.
-- `--no-max-prune` disable maximality pruning.
+Each model ships tables for 0, 25, 37, 42 and 50 °C.
+Temperatures between those are interpolated; temperatures outside 0 to 50 °C are rejected.
 
 ### Custom energy tables
 
-`--matrix` also accepts a path to a tab-separated table. The header is
-`q1	q2	t1	t2	delta_g_kcal_per_mol`; each further row is one dinucleotide
-stack: `q1 q2` is the query dinucleotide 5'→3', `t1 t2` the target dinucleotide
-3'→5' paired under it (`t1` opposite `q1`), bases from `A C G U N -` (`-` is a
-gap), and ΔG in kcal/mol at zero initiation offset (negative is favorable).
-Missing rows and rows with ΔG ≥ 20 are unobserved and scored as +20 kcal/mol.
-Rows of the form `X - X -` or `- X - X` are the helix-initiation terms; at least
-one must be present, and the initiation offset is derived from them.
-`--temperature` has no effect on a custom table; passing both prints a warning.
+The energy model can also be a tab-separated file with this header:
 
-## Compatibility and Migration
-
-Legacy short-hands are still accepted but deprecated. Prefer the replacements
-below in new usage.
-
-
-
-| Legacy usage | Modern usage | Notes |
-| --- | --- | --- |
-| `-i`, `--index` | `-t`, `--target` | Legacy target flags are deprecated aliases. |
-| `-p`, `-p2`, `-p3`, `-p4` | `--format detailed/cigar/bindingsite/minimal` | `--format` takes precedence if both are present. |
-| `-m c[:ps[:pe]]` | `--mismatch-max C --mismatch-prefix PS --mismatch-suffix PE` | Do not combine legacy and modern mismatch forms. |
-| `-s l`, `-s m:n`, `-s m:n/l` | `--seed-length L`, `--seed-start M --seed-end N`, plus optional `--seed-length L` | Do not combine legacy `-s` with `--seed-*` overrides. |
-| `-U`, `--no-guseed` | *(now the default)* | Seed wobble is off by default; opt in with `--seed-wobble`. |
-
-## Performance and Parallelism
-
-- Use `--jobs` to control CPU utilization.
-- For large runs, prefer file output (`-o file`) and compression (`--compress`)
-  to reduce I/O overhead and disk footprint.
-
-### OpenMP Profile for Faster Index Builds
-
-To enable OpenMP-backed suffix-array construction during `index`, build with
-the `openmp` feature:
-
-```bash
-cargo build --release --features openmp
+```text
+q1	q2	t1	t2	delta_g_kcal_per_mol
 ```
 
-Or install with OpenMP enabled:
+Each row gives the stacking free energy of two adjacent base pairs, `q1` with `t1` and `q2` with `t2`:
 
-```bash
-cargo install --path . --features openmp
+```text
+query   5'─ q1 ─ q2 ─ 3'
+             |    |
+target  3'─ t1 ─ t2 ─ 5'
 ```
 
-Run indexing with explicit thread settings:
+The query dinucleotide is read 5' to 3' and the target dinucleotide 3' to 5', so the target side appears reversed compared with its FASTA sequence.
+For example, the row `A C U G` scores the query 5'-AC-3' paired with the target 3'-UG-5', which reads GU in the target's FASTA file.
+Bases are `A C G U N`, and `-` stands for a gap.
+Energies are in kcal/mol, negative is favourable.
 
-```bash
-OMP_NUM_THREADS=16 risearch -j 16 index target.fa target.idx
-```
+Rows that are missing, or have a value of 20 or more, count as unobserved and score +20 kcal/mol.
+Rows of the form `X - X -` or `- X - X` are the helix initiation terms.
+The file needs at least one of them, and the initiation offset is derived from them.
+A custom table is used as-is at any temperature; setting a temperature with one prints a warning.
 
-Caveats:
+## Python
 
-- OpenMP currently changes the `index` suffix-array build path (libsais).
-  `search` is still multithreaded, but through Rayon (`--jobs`) rather than
-  OpenMP.
-- `--jobs` controls Rayon threads; OpenMP thread count is controlled separately
-  by the OpenMP runtime (for example `OMP_NUM_THREADS`).
-- On macOS, OpenMP builds can fail with `omp.h file not found` unless `libomp`
-  is installed and visible to the compiler/linker.
-- If OpenMP toolchain support is unavailable, build without `--features openmp`
-  and use the default single-threaded libsais path.
+The Python package wraps the same library and returns results as a [Polars](https://pola.rs) DataFrame; see [bindings/python/README.md](bindings/python/README.md).
 
-## Troubleshooting and FAQ
+## Troubleshooting
 
-### OpenMP build fails with `omp.h file not found`
+No hits: raise the energy threshold (`-e -15` instead of `-20`), shorten the seed with `--seed-length`, allow seed mismatches with `--mismatch-max`, or add `--seed-wobble`.
 
-OpenMP headers/runtime are missing from your toolchain. Install OpenMP for your
-platform (for example, `libomp` on macOS) and retry with
-`cargo build --release --features openmp`.
-
-### Why are thread counts different between `index` and `search`?
-
-`search` uses Rayon threads via `--jobs`. With `--features openmp`, part of
-`index` also uses OpenMP-controlled threads (for example via
-`OMP_NUM_THREADS`). Tune both if needed.
-
-### I still use `-s`, `-m`, or `-p` and see warnings
-
-Those flags are accepted for migration but deprecated. Use
-`--seed-start/--seed-end/--seed-length`, `--mismatch-*`, and `--format`.
-
-### Search returned no hits
-
-Start by relaxing constraints: increase `--energy` threshold (less negative),
-reduce `--seed-length`, increase extension length (`-l`), and if needed add
-`--seed-wobble` to allow G-U pairs in seeds.
-
-## Developer Validation
-
-Run all tests:
-
-```bash
-cargo test
-```
-
-Run selected integration suites:
-
-```bash
-cargo test --test cli_output_compress
-cargo test --test cli_multifile_and_seed_validation
-cargo test --lib reference_tests
-```
-
-Validate the Python bindings:
-
-```bash
-cd bindings/python
-uv sync --locked
-uv run --locked maturin develop
-uv run --locked pytest -q
-```
+`omp.h file not found` when building with `--features openmp`: the compiler cannot find an OpenMP installation.
+Install one for your platform, or build without the feature.
 
 ## License
 
-- Rust port in this repository: GNU GPL v3 (see [LICENSE](LICENSE)).
-- RIsearch2-derived scoring data retains its original attribution.
+[Business Source License 1.1](LICENSE)
