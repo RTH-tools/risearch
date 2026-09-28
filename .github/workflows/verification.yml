@@ -40,7 +40,7 @@ jobs:
         uses: ./.github/actions/setup-rust
 
       - name: Run generated and reference tests
-        run: cargo test --locked --workspace --all-features -- --test-threads=2
+        run: cargo test --locked --workspace --all-features
 
       - name: Upload property-test regressions
         if: ${{ failure() }}
@@ -93,7 +93,7 @@ jobs:
           CC: clang
           CXX: clang++
           ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
-        run: cargo +nightly test --target x86_64-unknown-linux-gnu --locked --no-default-features --features cli -p risearch -- --test-threads=2
+        run: cargo +nightly test --target x86_64-unknown-linux-gnu --locked --no-default-features --features cli -p risearch
 
   coverage:
     if: github.event_name == 'workflow_dispatch'
