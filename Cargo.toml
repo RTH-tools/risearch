@@ -88,10 +88,6 @@ required-features = ["mimalloc"]
 name = "seed"
 harness = false
 
-[[bench]]
-name = "output"
-harness = false
-
 [profile.test]
 opt-level = 3
 

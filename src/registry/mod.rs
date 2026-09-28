@@ -14,17 +14,6 @@ use crate::seq::Sequence;
 use crate::types::Base;
 
 #[doc(hidden)]
-pub trait RegistryEntry {
-    fn name(&self) -> &str;
-}
-
-impl RegistryEntry for String {
-    fn name(&self) -> &str {
-        self.as_str()
-    }
-}
-
-#[doc(hidden)]
 pub struct Registry<T> {
     entries: Vec<T>,
 }
@@ -38,12 +27,8 @@ impl<T> Registry<T> {
         self.entries.len()
     }
 
-    pub(crate) fn is_empty(&self) -> bool {
-        self.entries.is_empty()
-    }
-
-    pub(crate) fn entries(&self) -> &[T] {
-        &self.entries
+    pub(crate) fn iter(&self) -> impl Iterator<Item = (usize, &T)> {
+        self.entries.iter().enumerate()
     }
 }
 
@@ -52,34 +37,6 @@ impl<T> Index<usize> for Registry<T> {
 
     fn index(&self, idx: usize) -> &Self::Output {
         &self.entries[idx]
-    }
-}
-
-impl<T: RegistryEntry> Registry<T> {
-    /// Get name by index (unchecked for hot path).
-    ///
-    /// # Safety
-    /// Caller must ensure idx is valid (< number of entries).
-    /// In practice, idx is widened from a generated hit's compact registry
-    /// index, which is always valid.
-    #[inline(always)]
-    pub fn get_name(&self, idx: usize) -> &str {
-        debug_assert!(
-            idx < self.entries.len(),
-            "Registry index out of bounds: {} >= {}",
-            idx,
-            self.entries.len()
-        );
-        // SAFETY: idx comes from generated hits, guaranteed to be valid
-        unsafe { self.entries.get_unchecked(idx).name() }
-    }
-
-    pub(crate) fn index_of(&self, name: &str) -> Option<usize> {
-        self.entries.iter().position(|e| e.name() == name)
-    }
-
-    pub(crate) fn iter(&self) -> impl Iterator<Item = (usize, &T)> {
-        self.entries.iter().enumerate()
     }
 }
 
@@ -200,17 +157,10 @@ impl Query {
     }
 }
 
-impl RegistryEntry for Query {
-    fn name(&self) -> &str {
-        Query::name(self)
-    }
-}
-
 /// Registry of queries. Each `Query` carries its own metadata (sequence, seed
 /// interval, N-prefix); the per-query suffix array used for seeding is built
 /// on demand inside the seeding worker (see `seed::engine::SeedingEngine::seed_query`),
 /// so the registry holds no combined query SA.
-#[doc(hidden)]
 pub struct QueryRegistry {
     inner: Registry<Query>,
 }
@@ -223,22 +173,7 @@ impl QueryRegistry {
 
     /// Whether no queries were loaded.
     pub fn is_empty(&self) -> bool {
-        self.inner.is_empty()
-    }
-
-    /// All queries, in load order.
-    pub fn entries(&self) -> &[Query] {
-        self.inner.entries()
-    }
-
-    /// Name of the query at `idx`.
-    pub fn get_name(&self, idx: usize) -> &str {
-        self.inner.get_name(idx)
-    }
-
-    /// Position of the query with this name, if it was loaded.
-    pub fn index_of(&self, name: &str) -> Option<usize> {
-        self.inner.index_of(name)
+        self.len() == 0
     }
 
     /// Iterate `(index, query)` pairs in load order.
@@ -311,18 +246,6 @@ mod tests {
     }
 
     #[test]
-    fn string_entries_report_their_own_name() {
-        let registry = Registry::new(vec![String::from("query-1"), String::from("query-2")]);
-
-        assert_eq!(registry[0].name(), "query-1");
-        assert_eq!(registry[1].name(), "query-2");
-        assert_eq!(registry.len(), 2);
-        assert_eq!(registry.entries().len(), 2);
-        assert!(!registry.is_empty());
-        assert!(Registry::<String>::new(Vec::new()).is_empty());
-    }
-
-    #[test]
     fn query_registry_exposes_the_loaded_queries() {
         let empty = QueryRegistry {
             inner: Registry::new(Vec::new()),
@@ -339,8 +262,8 @@ mod tests {
             inner: Registry::new(vec![query]),
         };
         assert!(!loaded.is_empty());
-        assert_eq!(loaded.entries().len(), 1);
-        assert_eq!(loaded.get_name(0), "q");
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(loaded[0].name(), "q");
     }
 
     #[test]
@@ -405,9 +328,9 @@ mod tests {
         let registry = QueryRegistry::build(queries, &seed_config()).unwrap();
 
         assert_eq!(registry.len(), 3);
-        assert_eq!(registry.get_name(0), "alpha");
-        assert_eq!(registry.get_name(1), "beta");
-        assert_eq!(registry.get_name(2), "gamma");
+        assert_eq!(registry[0].name(), "alpha");
+        assert_eq!(registry[1].name(), "beta");
+        assert_eq!(registry[2].name(), "gamma");
     }
 
     #[test]
@@ -428,19 +351,6 @@ mod tests {
     #[test]
     fn build_rejects_no_queries() {
         assert!(QueryRegistry::build(Vec::new(), &seed_config()).is_err());
-    }
-
-    #[test]
-    fn query_registry_index_of_matches_only_the_named_query() {
-        let registry = QueryRegistry::build(
-            records(">seq1\nACGUACGU\n>seq2\nUUUUAAAA\n"),
-            &seed_config(),
-        )
-        .unwrap();
-
-        assert_eq!(registry.index_of("seq1"), Some(0));
-        assert_eq!(registry.index_of("seq2"), Some(1));
-        assert_eq!(registry.index_of("seq3"), None);
     }
 
     #[test]
