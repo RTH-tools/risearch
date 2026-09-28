@@ -10,6 +10,9 @@ updates:
       interval: weekly
     open-pull-requests-limit: 5
     groups:
+      arrow:
+        patterns:
+          - "arrow-*"
       cargo-minor-patch:
         update-types:
           - minor
