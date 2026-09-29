@@ -19,7 +19,7 @@ authors:
 preferred-citation:
   type: article
   title: "RIsearch and siOFF: An integrated, high-performance framework for RNA-RNA interaction and siRNA off-target prediction"
-  journal: Bioinformatics
+  status: in-preparation
   authors:
     - family-names: Roncelli
       given-names: Stefano
