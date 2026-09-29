@@ -71,7 +71,7 @@ The [documentation](https://saiden89.github.io/risearch/) covers every function 
 If you use RIsearch, please cite:
 
 > Roncelli S, Favaro L, Anthon C, Gorodkin J.
-> RIsearch and RIOT: An integrated, high-performance framework for RNA-RNA interaction and siRNA off-target prediction.
+> RIsearch and siOFF: An integrated, high-performance framework for RNA-RNA interaction and siRNA off-target prediction.
 > *Bioinformatics*.
 
 ## License

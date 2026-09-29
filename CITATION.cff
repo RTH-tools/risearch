@@ -18,7 +18,7 @@ authors:
     orcid: "https://orcid.org/0000-0001-5823-4000"
 preferred-citation:
   type: article
-  title: "RIsearch and RIOT: An integrated, high-performance framework for RNA-RNA interaction and siRNA off-target prediction"
+  title: "RIsearch and siOFF: An integrated, high-performance framework for RNA-RNA interaction and siRNA off-target prediction"
   journal: Bioinformatics
   authors:
     - family-names: Roncelli
