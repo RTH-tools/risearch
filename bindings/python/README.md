@@ -1,7 +1,7 @@
 # RIsearch for Python
 
 [![PyPI](https://img.shields.io/pypi/v/risearch)](https://pypi.org/project/risearch/)
-[![Python](https://img.shields.io/pypi/pyversions/risearch)](https://pypi.org/project/risearch/)
+[![Python](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2Fsaiden89%2Frisearch%2Fmain%2Fbindings%2Fpython%2Fpyproject.toml)](https://pypi.org/project/risearch/)
 [![CI](https://github.com/saiden89/risearch/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/saiden89/risearch/actions/workflows/ci.yml?query=branch%3Amain)
 [![License](https://img.shields.io/badge/license-BUSL--1.1-blue)](https://github.com/saiden89/risearch/blob/main/LICENSE)
 [![Docs](https://img.shields.io/badge/docs-online-blue)](https://saiden89.github.io/risearch/)
