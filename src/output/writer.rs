@@ -8,7 +8,7 @@ use flate2::write::GzEncoder;
 use flate2::Compression;
 use zstd::stream;
 
-use crate::config::OutputCompression;
+use crate::config::{OutputCompression, STDIO};
 
 /// Where a run's bytes go: one destination for everything, or one per key.
 ///
@@ -110,7 +110,7 @@ fn open_stream<'s>(
 }
 
 fn open_path(path: &Path, compress: OutputCompression) -> Result<Box<dyn Write + Send>> {
-    let inner: Box<dyn Write + Send> = if path == Path::new("-") {
+    let inner: Box<dyn Write + Send> = if path == Path::new(STDIO) {
         Box::new(std::io::stdout())
     } else {
         Box::new(fs_err::File::create(path)?)

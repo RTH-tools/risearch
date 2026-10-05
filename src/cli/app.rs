@@ -5,9 +5,10 @@ use std::num::NonZeroUsize;
 use std::path::Path;
 
 use anyhow::{Context, Result};
-use log::{debug, info, trace, warn};
+use log::{debug, info, trace};
 
 use crate::cli::args::validate_output_parent;
+use risearch::config::STDIO;
 use risearch::fastx::{read_sequences, read_sequences_from};
 use risearch::{output, search, Sequence, TargetRegistry};
 
@@ -26,10 +27,6 @@ pub(crate) fn run(cli: Cli) -> Result<()> {
     }
 }
 
-// =============================================================================
-// COMMAND HANDLERS
-// =============================================================================
-
 fn cmd_index(input: &Path, output: &Path, threads: Option<NonZeroUsize>) -> Result<()> {
     info!("Creating index: {:?} -> {:?}", input, output);
     validate_output_parent(output)?;
@@ -41,15 +38,12 @@ fn cmd_index(input: &Path, output: &Path, threads: Option<NonZeroUsize>) -> Resu
 }
 
 fn cmd_search(cmd: &SearchArgs) -> Result<()> {
+    let cmd = cmd.clone().resolve_legacy();
     let query_path = &cmd.input.query;
-    let target_path = cmd.input.target_path();
+    let target_path = cmd.input.target.as_deref().expect("clap requires a target");
     let output_path = &cmd.output.path;
 
-    // Deprecation warnings for the other legacy flags are emitted during conversion.
     let (opts, output) = cmd.clone().try_into_configs()?;
-    if cmd.input.uses_legacy_target() {
-        warn!("Legacy -i/--index is deprecated and will be removed in a future release; use -t/--target.");
-    }
 
     debug!("Loading queries from {:?}", query_path);
     let queries = read_input(query_path).context("Failed to load queries")?;
@@ -74,17 +68,13 @@ fn cmd_search(cmd: &SearchArgs) -> Result<()> {
 }
 
 fn read_input(path: &Path) -> Result<Vec<(String, Sequence)>> {
-    let records = if path == Path::new("-") {
+    let records = if path == Path::new(STDIO) {
         read_sequences_from(io::stdin(), "<stdin>")?
     } else {
         read_sequences(path)?
     };
     Ok(records)
 }
-
-// =============================================================================
-// INITIALIZATION
-// =============================================================================
 
 fn init_runtime(verbosity: u8, threads: Option<NonZeroUsize>) -> Result<()> {
     init_logging(verbosity);

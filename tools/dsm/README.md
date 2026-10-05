@@ -36,7 +36,7 @@ Generate all 15 TSV tables:
 uv run python pipeline.py all
 ```
 
-Each TSV loads directly in risearch via `--matrix path/to/37.tsv`.
+Each TSV loads directly in risearch via `--params-file path/to/37.tsv`.
 `s95` tables load in RNA-query/DNA-target orientation; the transposed form exists only as the bundled `s95-dna-rna`.
 
 Generate the Rust tables and their `mod.rs` for the runtime (writes to `../../src/dsm/tables/`):

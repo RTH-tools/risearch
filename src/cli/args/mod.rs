@@ -1,6 +1,7 @@
 mod extend;
 mod filter;
 mod input;
+mod legacy;
 mod output;
 mod score;
 mod search;

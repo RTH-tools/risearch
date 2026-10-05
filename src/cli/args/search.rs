@@ -1,6 +1,7 @@
 use anyhow::Error;
 use risearch::config::{ExtendConfig, OutputConfig, SearchConfig};
 
+use super::legacy::LegacyArgs;
 use super::{ExtendArgs, FilterArgs, InputArgs, OutputArgs, ScoreArgs, SeedArgs};
 
 /// Arguments that apply to the `search` subcommand
@@ -9,20 +10,23 @@ pub(crate) struct SearchArgs {
     #[command(flatten)]
     pub(crate) input: InputArgs,
 
-    #[command(flatten)]
+    #[command(flatten, next_help_heading = "Seed options")]
     pub(crate) seed: SeedArgs,
 
-    #[command(flatten)]
+    #[command(flatten, next_help_heading = "Energy model")]
     pub(crate) score: ScoreArgs,
 
-    #[command(flatten)]
+    #[command(flatten, next_help_heading = "Extension options")]
     pub(crate) extend: ExtendArgs,
 
-    #[command(flatten)]
+    #[command(flatten, next_help_heading = "Filter options")]
     pub(crate) filter: FilterArgs,
 
-    #[command(flatten)]
+    #[command(flatten, next_help_heading = "Output options")]
     pub(crate) output: OutputArgs,
+
+    #[command(flatten)]
+    pub(crate) legacy: LegacyArgs,
 }
 
 impl SearchArgs {

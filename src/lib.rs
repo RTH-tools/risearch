@@ -1,4 +1,4 @@
-//! RNA-RNA interaction search: suffix-array seeding with energy-based extension.
+//! RNA and DNA interaction search: suffix-array seeding with energy-based extension.
 //!
 //! The library behind the `risearch` binary. A run has two stages — build a
 //! target index once, then search queries against it.

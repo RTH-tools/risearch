@@ -444,7 +444,7 @@ def test_invalid_matrix_raises(store, caplog):
     """An unknown id fails validation without first being warned about as a table."""
     with (
         caplog.at_level(logging.WARNING, logger="risearch"),
-        pytest.raises(ValueError, match="DSM id"),
+        pytest.raises(ValueError, match="unknown energy parameter set"),
     ):
         risearch.search(QUERY_FA, store, matrix="t05", temperature=50)
     assert not [r for r in caplog.records if "temperature" in r.getMessage()]

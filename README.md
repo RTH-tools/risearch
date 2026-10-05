@@ -52,14 +52,15 @@ The columns are query name, query start and end, target name, target start and e
 Coordinates are 1-based and inclusive, and target coordinates always refer to the target as written in the FASTA file.
 The order of hits can change from run to run, so sort the output if you need a stable order.
 
-`risearch index --help` and `risearch search --help` list every option.
+`risearch index --help` and `risearch search --help` list every option; `risearch search --help` groups them by stage and ends with examples, and `-h` gives a short summary.
 
 ## Input
 
-`risearch index` reads target sequences from FASTA, plain or gzip-compressed.
-`risearch search` reads queries from FASTA, plain or gzip-compressed.
+`risearch index` reads target sequences and `risearch search` reads queries, both from FASTA or FASTQ.
+Files can be plain or compressed with gzip, bzip2, xz or zstd; the format and the compression are detected from the file contents.
 Either input can be `-` to read from stdin.
 T and U are treated as the same base, so DNA and RNA input give the same result.
+Record IDs must be unique within an input.
 
 Index files record their format version.
 If a release changes the format, `search` stops with an error naming the file, and you rebuild it with `risearch index`.
@@ -97,22 +98,28 @@ hsa-miR-24-3p MIMAT0000080	1	22	ENSG00000155366|ENST00000369642	528	553	-	-21.71
 
 Output goes to stdout unless you pass `-o`.
 A file name ending in `.gz` or `.zst` is compressed with gzip or zstd.
+`--compress` overrides the choice made from the file name.
+`--multifile` writes one file per query into the directory given by `-o`.
 
-## Energy models
+## Energy parameters
 
-| Model | Parameters | Query / target |
+Pick a bundled parameter set with `-P/--params` (default `t04`), or a table of your own with `--params-file`.
+
+| Set | Parameters | Query / target |
 | --- | --- | --- |
 | `t04` | Turner 2004 | RNA / RNA |
 | `slh04` | SantaLucia and Hicks 2004 | DNA / DNA |
 | `s95-rna-dna` | Sugimoto 1995 | RNA / DNA |
 | `s95-dna-rna` | Sugimoto 1995 | DNA / RNA |
 
-Each model ships tables for 0, 25, 37, 42 and 50 °C.
+Each set ships tables for 0, 25, 37, 42 and 50 °C, chosen with `-T`.
 Temperatures between those are interpolated; temperatures outside 0 to 50 °C are rejected.
+
+`-d` adds an energy penalty in kcal/mol for every nucleotide of the duplex, on both strands and including the seed, and the reported energy includes it.
 
 ### Custom energy tables
 
-The energy model can also be a tab-separated file with this header:
+Pass a tab-separated file to `--params-file`, with this header:
 
 ```text
 q1	q2	t1	t2	delta_g_kcal_per_mol

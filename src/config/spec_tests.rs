@@ -196,7 +196,7 @@ mod tests {
             .validate()
             .unwrap_err()
             .to_string()
-            .contains("unknown DSM"));
+            .contains("unknown energy parameter set"));
     }
 
     #[test]

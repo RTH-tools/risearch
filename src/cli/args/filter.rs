@@ -4,7 +4,7 @@ use risearch::types::Energy;
 /// Arguments for filtering and pruning policies
 #[derive(clap::Args, Debug, Clone)]
 pub(crate) struct FilterArgs {
-    /// Set deltaG energy threshold (in kcal/mol) to filter predictions
+    /// Report hits with a binding energy at or below this, in kcal/mol
     #[arg(
         short = 'e',
         long = "energy",
@@ -14,16 +14,19 @@ pub(crate) struct FilterArgs {
     )]
     pub(crate) total_energy: Energy,
 
-    /// Energy per length threshold that filters seeds (in kcal/mol)
+    /// Accepted for compatibility; the search does not use it yet
     #[arg(
         long = "seed-energy",
         value_name = "THRESHOLD",
-        default_value_t = FilterConfig::default().seed_energy
+        default_value_t = FilterConfig::default().seed_energy,
+        allow_hyphen_values = true
     )]
     pub(crate) seed_energy: Energy,
 
-    /// Report every maximal seed as its own hit instead of collapsing hits
-    /// that share a final bounding box to the lowest-energy alignment
+    /// Report one hit per seed instead of one per duplex
+    ///
+    /// By default, hits whose extended duplexes cover the same query and target span on the same
+    /// strand collapse to the one with the lowest energy.
     #[arg(long = "no-dedup", action = clap::ArgAction::SetTrue)]
     pub(crate) no_dedup: bool,
 }

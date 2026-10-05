@@ -1,6 +1,7 @@
-//! RNA dinucleotide stacking energy matrices (DSM)
+//! Dinucleotide stacking energy matrices (DSM) for RNA and DNA duplexes
 //!
-//! Tables encode nearest-neighbor thermodynamic parameters for RNA-RNA interactions.
+//! Tables encode nearest-neighbor thermodynamic parameters for RNA/RNA, DNA/DNA and RNA/DNA
+//! duplexes.
 //! Canonical table values are stored in kcal/mol and converted to score units on load.
 //!
 //! Indices: `[q1][q2][t1][t2]` = stacking energy for:
@@ -35,7 +36,22 @@ pub(crate) const fn flat_idx(q1: u8, q2: u8, t1: u8, t2: u8) -> usize {
         + t2 as usize
 }
 
-const NAMES: &[&str] = &["t04", "slh04", "s95-rna-dna", "s95-dna-rna"];
+const MODELS: [(&str, &str); 4] = [
+    ("t04", "Turner 2004, RNA/RNA"),
+    ("slh04", "SantaLucia & Hicks 2004, DNA/DNA"),
+    ("s95-rna-dna", "Sugimoto 1995, RNA query / DNA target"),
+    ("s95-dna-rna", "Sugimoto 1995, DNA query / RNA target"),
+];
+
+const NAMES: [&str; MODELS.len()] = {
+    let mut names = [""; MODELS.len()];
+    let mut i = 0;
+    while i < names.len() {
+        names[i] = MODELS[i].0;
+        i += 1;
+    }
+    names
+};
 
 /// Service for managing and loading dinucleotide stacking models (DSM).
 pub struct DsmRegistry;
@@ -43,7 +59,12 @@ pub struct DsmRegistry;
 impl DsmRegistry {
     /// List all available DSM string identifiers (for CLI/UI).
     pub const fn all_names() -> &'static [&'static str] {
-        NAMES
+        &NAMES
+    }
+
+    /// List the bundled parameter sets as `(identifier, description)` pairs (for CLI/UI).
+    pub const fn all_models() -> &'static [(&'static str, &'static str)] {
+        &MODELS
     }
 
     /// Accept a bundled identifier or a path to an existing TSV table.
@@ -52,7 +73,7 @@ impl DsmRegistry {
             Ok(DsmId(s.to_string()))
         } else {
             Err(Error::Dsm(format!(
-                "unknown DSM id '{s}': expected one of {} or a path to a TSV table",
+                "unknown energy parameter set '{s}': expected one of {} or a path to a TSV table",
                 NAMES.join(", ")
             )))
         }
@@ -86,7 +107,7 @@ impl DsmRegistry {
         let (Some(&(_, lo_t, lo_init, lo_table)), Some(&(_, hi_t, hi_init, hi_table))) = (lo, hi)
         else {
             return Err(Error::Dsm(format!(
-                "DSM '{name}' has no bundled table bracketing {temperature}C"
+                "energy parameter set '{name}' has no bundled table bracketing {temperature}C"
             )));
         };
         Ok(interpolate_tables(

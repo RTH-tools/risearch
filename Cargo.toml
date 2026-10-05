@@ -14,7 +14,7 @@ version.workspace = true
 rust-version.workspace = true
 
 edition.workspace = true
-description = "Fast RNA-RNA interaction search using suffix arrays and thermodynamic scoring"
+description = "Fast RNA and DNA interaction search using suffix arrays and thermodynamic scoring"
 repository = "https://github.com/saiden89/risearch"
 license.workspace = true
 keywords = ["rna", "bioinformatics", "suffix-array", "alignment", "genomics"]
@@ -44,7 +44,7 @@ openmp = ["libsais/openmp"]
 
 [dependencies]
 anyhow = { version = "1.0.47", optional = true }
-clap = { version = "4.0.0", features = ["derive"], optional = true }
+clap = { version = "4.4.1", features = ["derive", "wrap_help"], optional = true }
 env_logger = { version = "0.11.0", features = ["color"], optional = true }
 flate2 = { version = "1.0.30", default-features = false, features = ["zlib"] }
 fs-err = "3.0.0"

@@ -9,7 +9,7 @@ requires-python = ">=3.11"
 description = "Fast RNA and DNA interaction search, returning Polars DataFrames"
 readme = "README.md"
 authors = [{ name = "Stefano Roncelli", email = "stefano.roncelli@sund.ku.dk" }]
-keywords = ["RNA", "DNA", "bioinformatics", "RNA-RNA interaction", "sequence-search", "suffix-array"]
+keywords = ["RNA", "DNA", "bioinformatics", "sequence-search", "suffix-array"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",

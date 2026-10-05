@@ -27,12 +27,15 @@ pub const MAX_PENALTY_KCAL: f64 = 50.0;
 /// Lower bound on [`ScoreConfig::temperature`], in °C.
 pub const MIN_TEMPERATURE_C: i32 = 0;
 /// Upper bound on [`ScoreConfig::temperature`], in °C.
-pub const MAX_TEMPERATURE_C: i32 = 100;
+pub const MAX_TEMPERATURE_C: i32 = 50;
 
 /// [`ExtendConfig::max_extension`] sentinel: extend across the whole query.
 pub const UNLIMITED_EXTENSION: i32 = -1;
 /// Largest [`ExtendConfig::max_extension`] the DP grid accepts per side.
 pub const MAX_EXTENSION: i32 = MAX_EXT as i32;
+
+/// Path that stands for stdin when reading and stdout when writing.
+pub const STDIO: &str = "-";
 
 // =============================================================================
 // ENUMS (shared by config and CLI via clap derives)
@@ -46,13 +49,13 @@ pub const MAX_EXTENSION: i32 = MAX_EXT as i32;
     clap(rename_all = "lowercase")
 )]
 pub enum OutputFormat {
-    /// Detailed format with alignment (C: -p1)
+    /// Minimal columns, each hit preceded by a three-line alignment
     Detailed,
-    /// CIGAR-like interaction structure (C: -p2)
+    /// Minimal columns plus a pairing string
     Cigar,
-    /// Binding site with flanks for CRISPR (C: -p3)
+    /// Cigar columns plus the aligned target and its 5' and 3' flanks
     BindingSite,
-    /// Minimal: target, position, strand, energy (C: -p4)
+    /// Query, start, end, target, start, end, strand and energy
     #[default]
     Minimal,
 }
@@ -75,7 +78,7 @@ pub enum OutputCompression {
     None,
     /// gzip at the given level, 0–9.
     Gzip(u8),
-    /// zstd at the given level, -7..22.
+    /// zstd at the given level, within [`zstd::compression_level_range`].
     Zstd(i32),
 }
 
@@ -285,7 +288,7 @@ impl ScoreConfig {
             && Path::new(&dsm_id.0).is_file();
         if temperature.is_some() && custom {
             log::warn!(
-                "temperature has no effect on the custom DSM table '{dsm_id}'; it is used as-is."
+                "temperature has no effect on the custom energy parameter file '{dsm_id}'; it is used as-is."
             );
         }
         ScoreConfig {

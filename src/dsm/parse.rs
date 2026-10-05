@@ -16,10 +16,10 @@ pub(crate) fn parse_tsv(input: &str) -> Result<(Energy, DsmTable)> {
     let mut lines = input.lines().enumerate();
     let (_, header) = lines
         .next()
-        .ok_or_else(|| Error::Dsm("empty DSM table".into()))?;
+        .ok_or_else(|| Error::Dsm("empty energy parameter file".into()))?;
     if header.split('\t').ne(DSM_HEADER) {
         return Err(Error::Dsm(format!(
-            "bad DSM header '{header}', expected '{}'",
+            "bad energy parameter file header '{header}', expected '{}'",
             DSM_HEADER.join("\t")
         )));
     }
@@ -58,7 +58,7 @@ pub(crate) fn parse_tsv(input: &str) -> Result<(Energy, DsmTable)> {
     });
     if !peak.is_finite() {
         return Err(Error::Dsm(
-            "DSM table has no initiation rows (X - X - or - X - X)".into(),
+            "energy parameter file has no initiation rows (X - X - or - X - X)".into(),
         ));
     }
     let offset = peak * 2.0 + 1.0;
