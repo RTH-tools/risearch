@@ -38,6 +38,11 @@ jobs:
         working-directory: bindings/python
         run: uv run --locked maturin generate-stubs --out .
 
+      # Drop once maturin ships pyo3-introspection >= 0.29.3 (PyO3/pyo3#6273).
+      - name: Format type stub
+        working-directory: bindings/python
+        run: uv run --locked ruff format risearch/_native.pyi
+
       - name: Build site
         working-directory: bindings/python
         run: uv run --locked --group docs zensical build --clean
