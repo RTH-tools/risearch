@@ -31,8 +31,8 @@ pub const MAX_TEMPERATURE_C: i32 = 50;
 
 /// [`ExtendConfig::max_extension`] sentinel: extend across the whole query.
 pub const UNLIMITED_EXTENSION: i32 = -1;
-/// Largest [`ExtendConfig::max_extension`] the DP grid accepts per side.
-pub const MAX_EXTENSION: i32 = MAX_EXT as i32;
+/// Largest [`ExtendConfig::max_extension`] per side; the DP window also holds the seed's edge base.
+pub const MAX_EXTENSION: i32 = MAX_EXT as i32 - 1;
 
 /// Path that stands for stdin when reading and stdout when writing.
 pub const STDIO: &str = "-";
@@ -353,7 +353,7 @@ impl ExtendConfig {
 
     /// The fixed window size, or `None` for unlimited (follow the query).
     pub fn max_window(&self) -> Option<usize> {
-        (!self.is_unlimited()).then_some(self.max_extension as usize)
+        (!self.is_unlimited()).then(|| self.max_extension as usize + 1)
     }
 
     /// Check `max_extension` is the unlimited sentinel or within the DP cap.

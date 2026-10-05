@@ -22,7 +22,7 @@ use std::sync::Mutex;
 
 use self::extension::{ExtensionEngine, SeedExtension};
 use crate::alignment::{fingerprint_symbols, AlignColumn};
-use crate::config::SearchConfig;
+use crate::config::{SearchConfig, MAX_EXTENSION};
 use crate::dp::MAX_EXT;
 use crate::dsm::ScoringModel;
 use crate::index::store::TargetRegistry;
@@ -244,7 +244,7 @@ struct SearchContext<'a> {
 /// Unlimited extension (`-l -1`) promises to span the whole query, but the DP
 /// buffers cap each side at MAX_EXT. Refuse rather than silently clamp: a query
 /// longer than the cap cannot be served as requested. (Mirrors clap rejecting an
-/// explicit `-l > MAX_EXT`.)
+/// explicit `-l > MAX_EXTENSION`.)
 fn check_unlimited_fits(queries: &QueryRegistry, opts: &SearchConfig) -> Result<()> {
     if !opts.extend.is_unlimited() {
         return Ok(());
@@ -254,7 +254,7 @@ fn check_unlimited_fits(queries: &QueryRegistry, opts: &SearchConfig) -> Result<
         if n > MAX_EXT {
             return Err(Error::Config(format!(
                 "query '{}' is {n} nt; `-l -1` cannot extend across it ({MAX_EXT} nt cap). \
-                 Pass an explicit `-l <={MAX_EXT}` to accept the cap, or shorten the query.",
+                 Pass an explicit `-l <={MAX_EXTENSION}` to accept the cap, or shorten the query.",
                 q.name()
             )));
         }
@@ -879,7 +879,7 @@ mod tests {
     // itself as the oracle via metamorphic relations.
     //
     // Note on what is *not* tested: `-l -1` is **not** equivalent to a large fixed
-    // window such as `-l 256`. Unlimited sizes each extension window to the query
+    // window such as `-l 255`. Unlimited sizes each extension window to the query
     // bases available on that side (capped at the `dp::MAX_EXT` = 256 buffer
     // ceiling), whereas a fixed `-l k` permits up to `k` of extension including
     // large target-side bulges. The two therefore diverge on real data, so there

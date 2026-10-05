@@ -1,4 +1,5 @@
 use risearch::config::{ExtendConfig, MAX_EXTENSION, UNLIMITED_EXTENSION};
+use risearch::dp::MAX_EXT;
 
 /// Arguments for seed extension strategy
 #[derive(clap::Args, Debug, Clone)]
@@ -8,15 +9,15 @@ pub(crate) struct ExtendArgs {
         long = "extension",
         value_name = "LENGTH",
         help = format!(
-            "Extension window per seed side in nt, counting the seed's edge base; 0 or 1 keeps the \
-             seed alone, {UNLIMITED_EXTENSION} spans the whole query"
+            "Bases to extend on each seed side; 0 keeps the seed alone, {UNLIMITED_EXTENSION} spans \
+             the whole query"
         ),
         long_help = format!(
-            "Extension window per seed side in nt, counting the seed's edge base; 0 or 1 keeps the \
-             seed alone, {UNLIMITED_EXTENSION} spans the whole query\n\n\
-             -l N adds at most N-1 bases on each side, as in RIsearch2. {UNLIMITED_EXTENSION} is \
-             capped at {MAX_EXTENSION} nt per side; a longer query is rejected, so pass \
-             -l {MAX_EXTENSION} or less for it."
+            "Bases to extend on each seed side; 0 keeps the seed alone, {UNLIMITED_EXTENSION} spans \
+             the whole query\n\n\
+             -l N adds at most N bases on each side; \
+             {UNLIMITED_EXTENSION} rejects queries longer than {MAX_EXT} nt, so pass \
+             -l {MAX_EXTENSION} or less for those."
         ),
         default_value_t = ExtendConfig::default().max_extension,
         allow_hyphen_values = true,
