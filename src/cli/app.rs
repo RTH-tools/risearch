@@ -31,8 +31,7 @@ fn cmd_index(input: &Path, output: &Path, threads: Option<NonZeroUsize>) -> Resu
     info!("Creating index: {:?} -> {:?}", input, output);
     validate_output_parent(output)?;
     let targets = read_input(input).context("Failed to read targets")?;
-    let index = TargetRegistry::build(targets, threads).context("Failed to build index")?;
-    index.save(output).context("Failed to write index file")?;
+    TargetRegistry::build_to(targets, threads, output).context("Failed to create index")?;
     info!("Index saved to {:?}", output);
     Ok(())
 }

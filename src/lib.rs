@@ -12,7 +12,7 @@
 //! use risearch::TargetRegistry;
 //!
 //! let targets = read_sequences(Path::new("targets.fa"))?;
-//! TargetRegistry::build(targets, None)?.save(Path::new("targets.idx"))?;
+//! TargetRegistry::build_to(targets, None, Path::new("targets.idx"))?;
 //! # Ok::<(), risearch::Error>(())
 //! ```
 //!

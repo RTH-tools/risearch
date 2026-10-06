@@ -27,38 +27,12 @@ impl TargetRegistry {
     /// Build a target index over normalized sequences.
     ///
     /// The index is held in an anonymous mapping carrying the same image
-    /// [`save`](Self::save) writes, so a built and a reopened index are the same
+    /// [`build_to`](Self::build_to) writes, so a built and a reopened index are the same
     /// value. `threads` is the OpenMP team for suffix-array construction with
     /// the `openmp` feature and is ignored without it; `None` uses the OpenMP
     /// default (`OMP_NUM_THREADS`, else every core).
     pub fn build(targets: Vec<(String, Sequence)>, threads: Option<NonZeroUsize>) -> Result<Self> {
-        if targets.is_empty() {
-            return Err(Error::Input("No target sequences to index".into()));
-        }
-
-        let mut records = Vec::with_capacity(targets.len());
-        let mut combined_bases = Vec::new();
-
-        for (name, sequence) in targets {
-            records.push(TargetRecord {
-                name,
-                len: sequence.len() as u64,
-            });
-
-            combined_bases.reserve(2 * sequence.len() + 2);
-            combined_bases.extend(sequence[..].iter().rev().copied());
-            combined_bases.push(Base::Gap);
-            combined_bases.extend(sequence.iter().copied().map(Base::complement));
-            combined_bases.push(Base::Gap);
-        }
-
-        let suffix_index = SuffixIndex::build(combined_bases, threads)?;
-
-        let store = TargetStore {
-            targets: records,
-            sequence: suffix_index.sequence,
-            suffix_array: suffix_index.suffix_array,
-        };
+        let store = target_store(targets, threads)?;
 
         let mmap = archive::map_anon(&store)?;
         let source = "a freshly built target index";
@@ -68,12 +42,38 @@ impl TargetRegistry {
         Ok(Self { mmap, offsets })
     }
 
-    /// Write this index to `output` through a temporary file.
-    pub fn save(&self, output: &Path) -> Result<()> {
-        archive::write(output, self.mmap.as_ref())
+    /// Build a target index over normalized sequences and write it to `output`.
+    ///
+    /// The index is written beside `output` with `.tmp` appended, synced, then
+    /// renamed over it, so `output` holds either the previous index or the whole
+    /// new one. `threads` is as for [`build`](Self::build).
+    pub fn build_to(
+        targets: Vec<(String, Sequence)>,
+        threads: Option<NonZeroUsize>,
+        output: &Path,
+    ) -> Result<()> {
+        if output.is_dir() {
+            return Err(Error::Output(format!(
+                "Index output is a directory: {}",
+                output.display()
+            )));
+        }
+        let mut tmp = output.as_os_str().to_owned();
+        tmp.push(".tmp");
+        let tmp = Path::new(&tmp);
+
+        // Created before the sort so an unwritable destination fails fast.
+        let file = File::create(tmp)?;
+        let written = target_store(targets, threads)
+            .and_then(|store| archive::write_store(file, &store))
+            .and_then(|()| Ok(fs_err::rename(tmp, output)?));
+        if written.is_err() {
+            let _ = fs_err::remove_file(tmp);
+        }
+        written
     }
 
-    /// Map an index file written by [`save`](Self::save), validating its header
+    /// Map an index file written by [`build_to`](Self::build_to), validating its header
     /// and offset directory.
     pub fn open(path: &Path) -> Result<Self> {
         let file = File::open(path)?;
@@ -140,6 +140,39 @@ impl TargetRegistry {
     }
 }
 
+/// Lay out both strands of every target and build their suffix array.
+fn target_store(
+    targets: Vec<(String, Sequence)>,
+    threads: Option<NonZeroUsize>,
+) -> Result<TargetStore> {
+    if targets.is_empty() {
+        return Err(Error::Input("No target sequences to index".into()));
+    }
+
+    let mut records = Vec::with_capacity(targets.len());
+    let mut combined_bases = Vec::with_capacity(targets.iter().map(|(_, s)| 2 * s.len() + 2).sum());
+
+    for (name, sequence) in targets {
+        records.push(TargetRecord {
+            name,
+            len: sequence.len() as u64,
+        });
+
+        combined_bases.extend(sequence[..].iter().rev().copied());
+        combined_bases.push(Base::Gap);
+        combined_bases.extend(sequence.iter().copied().map(Base::complement));
+        combined_bases.push(Base::Gap);
+    }
+
+    let suffix_index = SuffixIndex::build(combined_bases, threads)?;
+
+    Ok(TargetStore {
+        targets: records,
+        sequence: suffix_index.sequence,
+        suffix_array: suffix_index.suffix_array,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use std::num::NonZeroUsize;
@@ -167,9 +200,9 @@ mod tests {
         let dir = tempdir().unwrap();
         let index_path = dir.path().join("targets.idx");
 
-        let built = TargetRegistry::build(targets(&[("chrA", "ACGUGA"), ("chrB", "UUUGCA")]), None)
-            .unwrap();
-        built.save(&index_path).unwrap();
+        let records = [("chrA", "ACGUGA"), ("chrB", "UUUGCA")];
+        let built = TargetRegistry::build(targets(&records), None).unwrap();
+        TargetRegistry::build_to(targets(&records), None, &index_path).unwrap();
         let store = TargetRegistry::open(&index_path).unwrap();
         assert_eq!(store.mmap.as_ref(), built.mmap.as_ref());
         let expected = [("chrA", 6usize), ("chrB", 6usize)];
@@ -259,5 +292,34 @@ mod tests {
         .unwrap();
 
         assert_eq!(store.offsets, [0, 10, 20]);
+    }
+
+    /// The open index spans several pages, so truncating its file in place
+    /// would fault on the next read instead of failing an assertion.
+    #[test]
+    fn rebuilding_over_an_open_index_keeps_it_readable() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("targets.idx");
+        let old = "ACGU".repeat(1000);
+        TargetRegistry::build_to(targets(&[("old", &old)]), None, &path).unwrap();
+        let open = TargetRegistry::open(&path).unwrap();
+
+        TargetRegistry::build_to(targets(&[("new", "GC")]), None, &path).unwrap();
+
+        assert_eq!(open.get_name(0), "old");
+        assert_eq!(open.target(0, Strand::Reverse).len(), old.len());
+        assert_eq!(TargetRegistry::open(&path).unwrap().get_name(0), "new");
+    }
+
+    #[test]
+    fn a_failed_rebuild_keeps_the_previous_index_and_no_temp_file() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("targets.idx");
+        TargetRegistry::build_to(targets(&[("old", "ACGU")]), None, &path).unwrap();
+
+        assert!(TargetRegistry::build_to(Vec::new(), None, &path).is_err());
+
+        assert_eq!(TargetRegistry::open(&path).unwrap().get_name(0), "old");
+        assert_eq!(fs_err::read_dir(dir.path()).unwrap().count(), 1);
     }
 }

@@ -10,11 +10,13 @@
 //! is the only representable one.
 
 use std::fmt::Display;
-use std::io::Write;
+use std::io::{self, BufWriter, Seek, SeekFrom, Write};
 use std::path::Path;
 
 use memmap2::{Mmap, MmapOptions};
 use rayon::prelude::*;
+use rkyv::ser::writer::{Buffer, IoWriter};
+use rkyv::ser::Positional;
 
 use crate::error::{Error, Result};
 use crate::types::Base;
@@ -107,7 +109,7 @@ pub(super) fn access<'a>(
     payload: &'a [u8],
     source: &dyn Display,
 ) -> Result<&'a ArchivedTargetStore> {
-    rkyv::access::<ArchivedTargetStore, rkyv::rancor::Error>(payload)
+    rkyv::access::<ArchivedTargetStore, rkyv::rancor::BoxedError>(payload)
         .map_err(|err| Error::Index(format!("Invalid target index archive: {source}: {err}")))
 }
 
@@ -205,31 +207,39 @@ pub(super) fn header(version: u32, sa_width: u8, payload_len: usize) -> [u8; HEA
 /// Serialize `store` into an anonymous read-only mapping holding the same
 /// header-and-payload image a file would.
 pub(super) fn map_anon(store: &TargetStore) -> Result<Mmap> {
-    let payload = rkyv::to_bytes::<rkyv::rancor::Error>(store)
-        .map_err(|err| Error::Index(format!("Failed to serialize target index: {err}")))?;
+    let payload_len = serialize(store, IoWriter::new(io::sink()))?.pos();
 
     let mut image = MmapOptions::new()
-        .len(HEADER_LEN + payload.len())
+        .len(HEADER_LEN + payload_len)
         .map_anon()?;
-    image[..HEADER_LEN].copy_from_slice(&header(FORMAT_VERSION, SA_WIDTH, payload.len()));
-    image[HEADER_LEN..].copy_from_slice(payload.as_slice());
+    image[..HEADER_LEN].copy_from_slice(&header(FORMAT_VERSION, SA_WIDTH, payload_len));
+    serialize(store, Buffer::from(&mut image[HEADER_LEN..]))?;
 
     Ok(image.make_read_only()?)
 }
 
-/// Publish `image` at `output` through a temporary file.
-pub(super) fn write(output: &Path, image: &[u8]) -> Result<()> {
-    let output_name = output
-        .file_name()
-        .map(|s| s.to_string_lossy().into_owned())
-        .unwrap_or_else(|| "target.idx".to_string());
-    let tmp_path = output.with_file_name(format!("{output_name}.tmp"));
+/// Write `store` into `file`, header last once the payload length is known,
+/// and sync it to disk.
+pub(super) fn write_store(file: fs_err::File, store: &TargetStore) -> Result<()> {
+    let mut file = BufWriter::new(file);
+    file.write_all(&[0; HEADER_LEN])?;
 
-    let mut file = fs_err::File::create(&tmp_path)?;
-    file.write_all(image)?;
-    drop(file);
+    let writer = serialize(store, IoWriter::new(file))?;
+    let payload_len = writer.pos();
 
-    Ok(fs_err::rename(&tmp_path, output)?)
+    let mut file = writer.into_inner();
+    file.seek(SeekFrom::Start(0))?;
+    file.write_all(&header(FORMAT_VERSION, SA_WIDTH, payload_len))?;
+    file.flush()?;
+    Ok(file.get_ref().sync_all()?)
+}
+
+fn serialize<W: rkyv::ser::Writer<rkyv::rancor::BoxedError>>(
+    store: &TargetStore,
+    writer: W,
+) -> Result<W> {
+    // Only the writer can fail while serializing a `TargetStore`.
+    Ok(rkyv::api::high::to_bytes_in(store, writer).map_err(io::Error::other)?)
 }
 
 #[cfg(target_endian = "little")]
@@ -248,12 +258,16 @@ pub(super) fn archived_u64_as_native(_values: &[rkyv::primitive::ArchivedU64]) -
 
 #[cfg(test)]
 mod tests {
+    use rkyv::ser::writer::IoWriter;
     use tempfile::tempdir;
 
+    use crate::error::Error;
     use crate::index::store::TargetRegistry;
     use crate::types::Base;
 
-    use super::{header, write, TargetRecord, TargetStore, FORMAT_VERSION, HEADER_LEN, SA_WIDTH};
+    use super::{
+        header, serialize, TargetRecord, TargetStore, FORMAT_VERSION, HEADER_LEN, SA_WIDTH,
+    };
 
     /// One target of one base: `A Gap A Gap`.
     fn tiny_store() -> TargetStore {
@@ -270,7 +284,7 @@ mod tests {
     fn write_image(path: &std::path::Path, version: u32, payload: &[u8]) {
         let mut image = header(version, SA_WIDTH, payload.len()).to_vec();
         image.extend_from_slice(payload);
-        write(path, &image).unwrap();
+        fs_err::write(path, &image).unwrap();
     }
 
     fn write_forged(path: &std::path::Path, version: u32, store: &TargetStore) {
@@ -481,5 +495,16 @@ mod tests {
         assert_eq!(suffixes.suffix_positions(0..1), &[past_end]);
         // SAFETY: index 0 is inside the suffix array.
         assert_eq!(unsafe { suffixes.base_unchecked(0, 0) }, Base::Gap);
+    }
+
+    /// Disk-full and similar failures surface from the writer inside rkyv and
+    /// must stay `Error::Io`, which the Python binding raises as `OSError`.
+    #[test]
+    fn serialization_write_errors_are_io_errors() {
+        let mut full = [0u8; 8];
+        let Err(err) = serialize(&tiny_store(), IoWriter::new(&mut full[..])) else {
+            panic!("an 8-byte buffer cannot hold the archive");
+        };
+        assert!(matches!(err, Error::Io(_)), "{err}");
     }
 }

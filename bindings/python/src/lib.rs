@@ -158,7 +158,7 @@ fn build_index(
     let threads = thread_count(threads)?;
     py.detach(|| {
         let targets = read_sequences(&fasta)?;
-        TargetRegistry::build(targets, threads)?.save(&output)
+        TargetRegistry::build_to(targets, threads, &output)
     })?;
     Ok(())
 }

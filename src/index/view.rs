@@ -37,16 +37,6 @@ impl<'a> TargetView<'a> {
         self.suffixes
     }
 
-    /// Return a range of target positions in lexicographic suffix order.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `interval` is not a valid range within the suffix index.
-    #[inline]
-    pub(crate) fn suffix_positions(self, interval: Range<usize>) -> &'a [u64] {
-        self.suffixes.suffix_positions(interval)
-    }
-
     /// Return the selected physical target strand in duplex-column order.
     ///
     /// For input `T` written 5' to 3', Forward is `R(T)` and Reverse is `C(T)`.

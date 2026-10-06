@@ -126,7 +126,10 @@ fn emit_seed_match<const WOBBLE: bool, F: FnMut(SeedHit)>(
             continue;
         };
 
-        for &target_sa_pos in tview.suffix_positions(raw_match.target_interval.clone()) {
+        for &target_sa_pos in tview
+            .suffixes()
+            .suffix_positions(raw_match.target_interval.clone())
+        {
             let Some((target_idx, strand, target_start)) =
                 tview.map_seed_pos(target_sa_pos as usize, seed_len)
             else {
