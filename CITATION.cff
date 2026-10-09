@@ -2,7 +2,7 @@ cff-version: 1.2.0
 message: "If you use RIsearch, please cite the following references."
 title: RIsearch
 license: BUSL-1.1
-repository-code: "https://github.com/saiden89/risearch"
+repository-code: "https://github.com/RTH-tools/risearch"
 authors:
   - family-names: Roncelli
     given-names: Stefano

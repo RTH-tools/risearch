@@ -23,11 +23,11 @@ classifiers = [
 dependencies = ["polars>=1.43.2"]
 
 [project.urls]
-Homepage = "https://github.com/saiden89/risearch"
-Documentation = "https://saiden89.github.io/risearch/"
-Repository = "https://github.com/saiden89/risearch"
-Issues = "https://github.com/saiden89/risearch/issues"
-Changelog = "https://github.com/saiden89/risearch/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/RTH-tools/risearch"
+Documentation = "https://rth-tools.github.io/risearch/"
+Repository = "https://github.com/RTH-tools/risearch"
+Issues = "https://github.com/RTH-tools/risearch/issues"
+Changelog = "https://github.com/RTH-tools/risearch/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 lts-cpu = ["polars[rtcompat]"]

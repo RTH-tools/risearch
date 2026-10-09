@@ -1,9 +1,9 @@
 [project]
 site_name = "RIsearch for Python"
 site_description = "Fast RNA and DNA interaction search, returning Polars DataFrames"
-site_url = "https://saiden89.github.io/risearch/"
-repo_url = "https://github.com/saiden89/risearch"
-repo_name = "saiden89/risearch"
+site_url = "https://rth-tools.github.io/risearch/"
+repo_url = "https://github.com/RTH-tools/risearch"
+repo_name = "RTH-tools/risearch"
 nav = [
   { "Overview" = "index.md" },
   { "Guide" = "guide.md" },

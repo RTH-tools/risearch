@@ -1,10 +1,10 @@
 # RIsearch
 
-[![CI](https://github.com/saiden89/risearch/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/saiden89/risearch/actions/workflows/ci.yml?query=branch%3Amain)
-[![Release](https://img.shields.io/github/v/release/saiden89/risearch?include_prereleases&sort=semver)](https://github.com/saiden89/risearch/releases)
+[![CI](https://github.com/RTH-tools/risearch/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/RTH-tools/risearch/actions/workflows/ci.yml?query=branch%3Amain)
+[![Release](https://img.shields.io/github/v/release/RTH-tools/risearch?include_prereleases&sort=semver)](https://github.com/RTH-tools/risearch/releases)
 [![License](https://img.shields.io/badge/license-BUSL--1.1-blue)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.88%2B-orange)](https://www.rust-lang.org)
-[![Python](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2Fsaiden89%2Frisearch%2Fmain%2Fbindings%2Fpython%2Fpyproject.toml)](bindings/python)
+[![Python](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2FRTH-tools%2Frisearch%2Fmain%2Fbindings%2Fpython%2Fpyproject.toml)](bindings/python)
 
 RIsearch predicts RNA and DNA interactions: RNA-RNA, DNA-DNA and RNA-DNA hybrids.
 You give it query sequences, such as miRNAs or siRNAs, and a set of targets, such as a transcriptome.
@@ -19,7 +19,7 @@ Options and output may still change before 3.0.0.
 
 ## Installation
 
-Prebuilt binaries for Linux (x86_64, aarch64) and macOS (Apple Silicon, Intel) are attached to every [release](https://github.com/saiden89/risearch/releases), each with a SHA-256 checksum.
+Prebuilt binaries for Linux (x86_64, aarch64) and macOS (Apple Silicon, Intel) are attached to every [release](https://github.com/RTH-tools/risearch/releases), each with a SHA-256 checksum.
 
 Or build it with Cargo (Rust 1.88 or newer):
 

@@ -6,7 +6,7 @@ license.workspace = true
 edition.workspace = true
 publish = false
 description = "Python extension module for RIsearch"
-repository = "https://github.com/saiden89/risearch"
+repository = "https://github.com/RTH-tools/risearch"
 include = [
     "/src/**",
     "/risearch/*.py",

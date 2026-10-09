@@ -15,7 +15,7 @@ rust-version.workspace = true
 
 edition.workspace = true
 description = "Fast RNA and DNA interaction search using suffix arrays and thermodynamic scoring"
-repository = "https://github.com/saiden89/risearch"
+repository = "https://github.com/RTH-tools/risearch"
 license.workspace = true
 keywords = ["rna", "bioinformatics", "suffix-array", "alignment", "genomics"]
 categories = ["science::bioinformatics", "command-line-utilities", "algorithms"]

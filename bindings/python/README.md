@@ -1,16 +1,16 @@
 # RIsearch for Python
 
 [![PyPI](https://img.shields.io/pypi/v/risearch)](https://pypi.org/project/risearch/)
-[![Python](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2Fsaiden89%2Frisearch%2Fmain%2Fbindings%2Fpython%2Fpyproject.toml)](https://pypi.org/project/risearch/)
-[![CI](https://github.com/saiden89/risearch/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/saiden89/risearch/actions/workflows/ci.yml?query=branch%3Amain)
-[![License](https://img.shields.io/badge/license-BUSL--1.1-blue)](https://github.com/saiden89/risearch/blob/main/LICENSE)
-[![Docs](https://img.shields.io/badge/docs-online-blue)](https://saiden89.github.io/risearch/)
+[![Python](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2FRTH-tools%2Frisearch%2Fmain%2Fbindings%2Fpython%2Fpyproject.toml)](https://pypi.org/project/risearch/)
+[![CI](https://github.com/RTH-tools/risearch/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/RTH-tools/risearch/actions/workflows/ci.yml?query=branch%3Amain)
+[![License](https://img.shields.io/badge/license-BUSL--1.1-blue)](https://github.com/RTH-tools/risearch/blob/main/LICENSE)
+[![Docs](https://img.shields.io/badge/docs-online-blue)](https://rth-tools.github.io/risearch/)
 
 RIsearch predicts RNA and DNA interactions: RNA-RNA, DNA-DNA and RNA-DNA hybrids.
 You give it query sequences, such as miRNAs or siRNAs, and a set of targets, such as a transcriptome.
 It reports every duplex whose predicted free energy is at or below a threshold, with coordinates, strand, energy and the pairing pattern, as a [Polars](https://pola.rs) DataFrame.
 
-This package wraps the same Rust library as the [`risearch` command-line tool](https://github.com/saiden89/risearch), a rewrite of [RIsearch2](https://doi.org/10.1093/nar/gkw1325).
+This package wraps the same Rust library as the [`risearch` command-line tool](https://github.com/RTH-tools/risearch), a rewrite of [RIsearch2](https://doi.org/10.1093/nar/gkw1325).
 It is a pre-release: options and output may still change before 3.0.0.
 
 ## Installation
@@ -29,7 +29,7 @@ On older x86-64 CPUs, or x86-64 Python running under Rosetta, install the compat
 pip install "risearch[lts-cpu]"
 ```
 
-The package does not install the `risearch` command-line program; its [releases](https://github.com/saiden89/risearch/releases) ship prebuilt binaries.
+The package does not install the `risearch` command-line program; its [releases](https://github.com/RTH-tools/risearch/releases) ship prebuilt binaries.
 
 ## Quick start
 
@@ -43,7 +43,7 @@ hits = risearch.search("mirnas.fa", targets)
 ```
 
 `hits` has one row per interaction.
-With the example in the repository, two human miRNAs against the 19 transcripts of RHOC in [`tests/data`](https://github.com/saiden89/risearch/tree/main/tests/data):
+With the example in the repository, two human miRNAs against the 19 transcripts of RHOC in [`tests/data`](https://github.com/RTH-tools/risearch/tree/main/tests/data):
 
 ```python
 >>> hits.sort("energy", "target_name", "t_start").select(
@@ -64,7 +64,7 @@ shape: (3, 6)
 Coordinates are 0-based and inclusive, unlike the 1-based CLI output.
 The row order can change from run to run, so sort when you need a stable order.
 
-The [documentation](https://saiden89.github.io/risearch/) covers every function and option, the result columns, the energy models and logging.
+The [documentation](https://rth-tools.github.io/risearch/) covers every function and option, the result columns, the energy models and logging.
 
 ## Citation
 
@@ -76,4 +76,4 @@ If you use RIsearch, please cite:
 
 ## License
 
-[Business Source License 1.1](https://github.com/saiden89/risearch/blob/main/LICENSE).
+[Business Source License 1.1](https://github.com/RTH-tools/risearch/blob/main/LICENSE).
