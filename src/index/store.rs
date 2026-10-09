@@ -1,6 +1,8 @@
 //! Runtime handle over a mapped target index file.
 
+use std::io::Seek;
 use std::num::NonZeroUsize;
+use std::os::unix::fs::FileTypeExt;
 use std::path::Path;
 
 use fs_err::File;
@@ -44,33 +46,47 @@ impl TargetRegistry {
 
     /// Build a target index over normalized sequences and write it to `output`.
     ///
-    /// The index is written beside `output` with `.tmp` appended, synced, then
-    /// renamed over it, so `output` holds either the previous index or the whole
-    /// new one. `threads` is as for [`build`](Self::build).
+    /// A character device such as `/dev/null` is written directly and must be
+    /// seekable. Any other `output` but a directory is written beside itself
+    /// with `.tmp` appended, synced, then renamed over, so it holds either the
+    /// previous index or the whole new one. `threads` is as for
+    /// [`build`](Self::build).
     pub fn build_to(
         targets: Vec<(String, Sequence)>,
         threads: Option<NonZeroUsize>,
         output: &Path,
     ) -> Result<()> {
-        if output.is_dir() {
-            return Err(Error::Output(format!(
+        let build = |mut file: File| {
+            target_store(targets, threads)
+                .and_then(|store| archive::write_store(&mut file, &store))
+                .map(|()| file)
+        };
+        match fs_err::metadata(output) {
+            Ok(meta) if meta.is_dir() => Err(Error::Output(format!(
                 "Index output is a directory: {}",
                 output.display()
-            )));
-        }
-        let mut tmp = output.as_os_str().to_owned();
-        tmp.push(".tmp");
-        let tmp = Path::new(&tmp);
+            ))),
+            Ok(meta) if meta.file_type().is_char_device() => {
+                let mut file = File::create(output)?;
+                // Fails before the sort on a device that cannot seek, such as a terminal.
+                file.rewind()?;
+                build(file).map(drop)
+            }
+            _ => {
+                let mut tmp = output.as_os_str().to_owned();
+                tmp.push(".tmp");
+                let tmp = Path::new(&tmp);
 
-        // Created before the sort so an unwritable destination fails fast.
-        let file = File::create(tmp)?;
-        let written = target_store(targets, threads)
-            .and_then(|store| archive::write_store(file, &store))
-            .and_then(|()| Ok(fs_err::rename(tmp, output)?));
-        if written.is_err() {
-            let _ = fs_err::remove_file(tmp);
+                // Created before the sort so an unwritable destination fails fast.
+                let written = build(File::create(tmp)?)
+                    .and_then(|file| Ok(file.sync_all()?))
+                    .and_then(|()| Ok(fs_err::rename(tmp, output)?));
+                if written.is_err() {
+                    let _ = fs_err::remove_file(tmp);
+                }
+                written
+            }
         }
-        written
     }
 
     /// Map an index file written by [`build_to`](Self::build_to), validating its header
@@ -176,9 +192,12 @@ fn target_store(
 #[cfg(test)]
 mod tests {
     use std::num::NonZeroUsize;
+    use std::os::unix::fs::FileTypeExt;
+    use std::path::Path;
 
     use tempfile::tempdir;
 
+    use crate::error::Error;
     use crate::index::sa::SuffixIndex;
     use crate::seq::Sequence;
     use crate::types::{Base, Strand};
@@ -312,7 +331,7 @@ mod tests {
     }
 
     #[test]
-    fn a_failed_rebuild_keeps_the_previous_index_and_no_temp_file() {
+    fn failed_rebuild_keeps_the_previous_index_and_no_temp_file() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("targets.idx");
         TargetRegistry::build_to(targets(&[("old", "ACGU")]), None, &path).unwrap();
@@ -321,5 +340,23 @@ mod tests {
 
         assert_eq!(TargetRegistry::open(&path).unwrap().get_name(0), "old");
         assert_eq!(fs_err::read_dir(dir.path()).unwrap().count(), 1);
+    }
+
+    /// `/dev` takes no sibling `.tmp`, and Linux rejects fsync on `/dev/null`.
+    #[test]
+    fn device_output_is_written_directly() {
+        TargetRegistry::build_to(targets(&[("t", "ACGU")]), None, Path::new("/dev/null")).unwrap();
+        assert!(fs_err::metadata("/dev/null")
+            .unwrap()
+            .file_type()
+            .is_char_device());
+    }
+
+    #[test]
+    fn directory_output_is_rejected() {
+        let dir = tempdir().unwrap();
+        let err =
+            TargetRegistry::build_to(targets(&[("t", "ACGU")]), None, dir.path()).unwrap_err();
+        assert!(matches!(err, Error::Output(_)), "{err}");
     }
 }

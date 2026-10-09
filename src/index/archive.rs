@@ -218,9 +218,8 @@ pub(super) fn map_anon(store: &TargetStore) -> Result<Mmap> {
     Ok(image.make_read_only()?)
 }
 
-/// Write `store` into `file`, header last once the payload length is known,
-/// and sync it to disk.
-pub(super) fn write_store(file: fs_err::File, store: &TargetStore) -> Result<()> {
+/// Write `store` into `file`, header last once the payload length is known.
+pub(super) fn write_store(file: impl Write + Seek, store: &TargetStore) -> Result<()> {
     let mut file = BufWriter::new(file);
     file.write_all(&[0; HEADER_LEN])?;
 
@@ -230,8 +229,7 @@ pub(super) fn write_store(file: fs_err::File, store: &TargetStore) -> Result<()>
     let mut file = writer.into_inner();
     file.seek(SeekFrom::Start(0))?;
     file.write_all(&header(FORMAT_VERSION, SA_WIDTH, payload_len))?;
-    file.flush()?;
-    Ok(file.get_ref().sync_all()?)
+    Ok(file.flush()?)
 }
 
 fn serialize<W: rkyv::ser::Writer<rkyv::rancor::BoxedError>>(
