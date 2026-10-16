@@ -33,16 +33,18 @@ The package does not install the `risearch` command-line program; its [releases]
 
 ## Quick start
 
+The following example requires you to have cloned the github repository to run
+
 ```python
 import risearch
 
-risearch.index("targets.fa", "targets.idx")  # build once
+risearch.index("tests/data/target.fa", "targets.idx")  # build once
 targets = risearch.TargetRegistry.open("targets.idx")  # reuse for every search
 
-hits = risearch.search("mirnas.fa", targets)
+hits = risearch.search("tests/data/query.fa", targets)
 ```
 
-`hits` has one row per interaction.
+`hits` is a polars DataFrame with one row per interaction.
 With the example in the repository, two human miRNAs against the 19 transcripts of RHOC in [`tests/data`](https://github.com/RTH-tools/risearch/tree/main/tests/data):
 
 ```python
@@ -64,7 +66,7 @@ shape: (3, 6)
 Coordinates are 0-based and inclusive, unlike the 1-based CLI output.
 The row order can change from run to run, so sort when you need a stable order.
 
-The [documentation](https://rth-tools.github.io/risearch/) covers every function and option, the result columns, the energy models and logging.
+The [API documentation](https://rth-tools.github.io/risearch/api/) covers every function and option. A short [guide](https://rth-tools.github.io/risearch/) covers the result columns, the energy models and logging.
 
 ## Citation
 

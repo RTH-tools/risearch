@@ -33,9 +33,19 @@ On macOS that means installing `libomp` and making it visible to the compiler an
 
 ## Quick start
 
+To run the examples below you need to install the risearch binary with cargo as explained above and clone the git repository. Then run the commands from repository folder.
+
+```
+git clone https://github.com/RTH-tools/risearch
+cargo install --locked risearch --version 3.0.0-alpha.4
+#warning: be sure to add `$HOME/.cargo/bin` to your PATH to be able to run the installed binaries
+export PATH=$PATH:$HOME/.cargo/bin
+```
+
 The repository includes a small example: two human miRNAs, miR-24-3p and miR-876-5p, as queries and the 19 transcripts of RHOC as targets.
 
 ```bash
+cd risearch
 risearch index tests/data/target.fa target.idx
 risearch search -q tests/data/query.fa -t target.idx -o hits.tsv
 ```
@@ -88,12 +98,15 @@ The pairing string has one character per alignment column, following the query 5
 | `Q` | extra base on the query side (gap in the target) |
 
 In `detailed` output the query is on top (5' to 3'), the target underneath (3' to 5'), and the middle row marks Watson-Crick pairs with `|` and wobble pairs with `:`:
-
+```
+risearch search -f detailed -q tests/data/query.fa -t target.idx -o hits_detailed.out
+```
+would produce the same hits in detailed format, for example
 ```text
-uggcucaguu-----cagcaggaacag
-|||||| ||      |||||||  |||
-accgagacacccugugucgucc-cguc
-hsa-miR-24-3p MIMAT0000080	1	22	ENSG00000155366|ENST00000369642	528	553	-	-21.71
+ggcucaguu-cagcag-ga--acag
+||||||||: |||||: |   ||||
+ccgagucagggucguuacggguguc
+hsa-miR-24-3p MIMAT0000080      2       22      ENSG00000155366|ENST00000527563 482     506     +       -25.33
 ```
 
 Output goes to stdout unless you pass `-o`.
