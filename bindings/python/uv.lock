@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.11"
 
 [[package]]
@@ -515,7 +515,7 @@ docs = [
 
 [package.metadata]
 requires-dist = [
-    { name = "polars", specifier = ">=1.43.2" },
+    { name = "polars", specifier = ">=2.0.0" },
     { name = "polars", extras = ["rtcompat"], marker = "extra == 'lts-cpu'" },
 ]
 provides-extras = ["lts-cpu"]

@@ -20,7 +20,7 @@ classifiers = [
     "Operating System :: POSIX :: Linux",
     "Operating System :: MacOS",
 ]
-dependencies = ["polars>=1.43.2"]
+dependencies = ["polars>=2.0.0"]
 
 [project.urls]
 Homepage = "https://github.com/RTH-tools/risearch"
@@ -64,7 +64,6 @@ build-frontend = "build[uv]"
 config-settings = { build-args = "--generate-stubs" }
 build = ["cp*-manylinux_*", "cp*-macosx_arm64"]
 skip = "cp*t-*"
-test-skip = "cp315-*"  # polars 1.44 Series methods return None on 3.15rc: pola-rs/polars#29419
 test-requires = ["pytest"]
 test-command = "pytest {package}/tests/test_bindings.py -k 'not cli' -q --import-mode=importlib"
 
