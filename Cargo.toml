@@ -57,7 +57,7 @@ needletail = "0.7.0"
 rayon = "1.0.3"
 rkyv = { version = "0.8.0", features = ["bytecheck", "std", "pointer_width_64"] }
 thiserror = "2.0.0"
-zstd = "0.13.2"
+zstd = "0.14.2"
 
 [dev-dependencies]
 approx = "0.5.1"
