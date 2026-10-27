@@ -37,7 +37,6 @@ To run the examples below you need to install the risearch binary with cargo as 
 
 ```
 git clone https://github.com/RTH-tools/risearch
-cargo install --locked risearch --version 3.0.0-alpha.4
 #warning: be sure to add `$HOME/.cargo/bin` to your PATH to be able to run the installed binaries
 export PATH=$PATH:$HOME/.cargo/bin
 ```
