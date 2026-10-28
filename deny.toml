@@ -5,6 +5,11 @@ targets = ["x86_64-unknown-linux-gnu", "aarch64-apple-darwin"]
 [advisories]
 yanked = "deny"
 unmaintained = "all"
+ignore = [
+    { id = "RUSTSEC-2026-0391", reason = "zstd 0.13 only via needletail 0.7.3, which never calls with_context" },
+    { id = "RUSTSEC-2026-0398", reason = "zstd-safe 7 only via zstd 0.13.3, which has no seekable feature" },
+    { id = "RUSTSEC-2026-0403", reason = "zstd-safe 7 only via needletail 0.7.3, which decodes with read::Decoder" },
+]
 
 [licenses]
 include-dev = true
