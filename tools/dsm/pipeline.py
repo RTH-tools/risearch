@@ -400,7 +400,7 @@ def cmd_one(
     if did is None:
         logger.error("unknown DSM ID '{}', valid: {}", dsm_id, ", ".join(_DSM_BY_ID))
         raise SystemExit(1)
-    _ = run_pipeline(did, temperature, output / did.id, workers)
+    _ = run_pipeline(did, temperature, output, workers)
 
 
 @app.command("rust")
