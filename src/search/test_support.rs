@@ -6,7 +6,7 @@ use std::sync::LazyLock;
 use super::{run_search, SearchHit, VecSink};
 use crate::error::Result;
 use crate::fastx::read_sequences;
-use crate::{SearchConfig, Sequence, TargetRegistry};
+use crate::{Energy, SearchConfig, Sequence, TargetRegistry};
 
 /// A `tests/data` file, resolved against the crate root the way
 /// `tests/cli_library_agreement.rs` resolves it.
@@ -46,6 +46,21 @@ pub(super) fn config(edit: impl FnOnce(&mut SearchConfig)) -> SearchConfig {
     let mut config = SearchConfig::default();
     edit(&mut config);
     config
+}
+
+/// Settings that produce overlapping-seed box collisions on the corpus
+/// (~33% redundant rows): short seed, mismatches, wide window, permissive
+/// energy.
+pub(super) fn collision_config() -> SearchConfig {
+    config(|c| {
+        c.seed.seed_length = Some(6);
+        c.seed.seed_wobble = true;
+        c.seed.max_mismatches = 2;
+        c.seed.min_suffix_matches = 0;
+        c.extend.max_extension = 30;
+        c.extend.build_alignment = false;
+        c.filter.delta_g = Energy::from_kcal(-5.0);
+    })
 }
 
 /// Run the production search and collect its hits.

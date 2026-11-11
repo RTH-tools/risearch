@@ -396,52 +396,11 @@ impl SearchHit {
 
 #[cfg(test)]
 mod tests {
-    use std::io::Read;
-
-    use super::test_support::{config, records, search, QUERIES, TARGETS};
+    use super::test_support::{collision_config, config, records, search, QUERIES, TARGETS};
     use super::*;
-    use crate::config::{OutputCompression, OutputConfig, OutputFormat};
     use crate::index::store::TargetRegistry;
-    use crate::output::TextSink;
     use crate::types::DsmId;
-    use crate::Sequence;
     use rstest::rstest;
-
-    fn detailed_output() -> OutputConfig {
-        OutputConfig {
-            format: OutputFormat::Detailed,
-            compress: OutputCompression::None,
-            multifile: false,
-        }
-    }
-
-    fn minimal_output() -> OutputConfig {
-        OutputConfig {
-            format: OutputFormat::Minimal,
-            ..detailed_output()
-        }
-    }
-
-    #[test]
-    fn text_output_emits_one_line_per_hit() {
-        let output = minimal_output();
-        // Mirror what the CLI derives for Minimal, so this also covers dedup's
-        // empty-fingerprint (first-wins) tie-break.
-        let config = config(|c| c.extend.build_alignment = false);
-
-        let out = tempfile::NamedTempFile::with_suffix(".tsv").unwrap();
-        let hits = search_to_path(&QUERIES, &TARGETS, &config, &output, out.path());
-        let file_hit_count = fs_err::read_to_string(out.path())
-            .unwrap()
-            .lines()
-            .filter(|line| !line.trim().is_empty())
-            .count();
-
-        assert_eq!(
-            hits, file_hit_count,
-            "text output must emit exactly one line per retained hit"
-        );
-    }
 
     #[test]
     fn no_hits_below_an_unreachable_cutoff() {
@@ -464,206 +423,55 @@ mod tests {
         assert!(err.to_string().contains(message), "{err}");
     }
 
-    /// Zero-hit behaviour differs by topology and neither branch is covered by a
-    /// CLI test: multifile creates no file at all, single-file truncates the
-    /// output to nothing.
-    #[test]
-    fn zero_hit_run_writes_empty_file_but_no_multifile_entry() {
-        let config = config(|c| c.filter.delta_g = Energy::from_kcal(-100.0));
-        let mut output = detailed_output();
-
-        let out = tempfile::NamedTempFile::with_suffix(".tsv").unwrap();
-        fs_err::write(out.path(), b"stale").unwrap();
-        search_to_path(&QUERIES, &TARGETS, &config, &output, out.path());
-        assert_eq!(fs_err::metadata(out.path()).unwrap().len(), 0);
-
-        output.multifile = true;
-        let tmp = tempfile::tempdir().unwrap();
-        // Not pre-created, so this also pins that the directory itself is made.
-        let dir = tmp.path().join("multi");
-        search_to_path(&QUERIES, &TARGETS, &config, &output, &dir);
-        assert_eq!(fs_err::read_dir(&dir).unwrap().count(), 0);
+    /// Records what the driver does to its sink.
+    #[derive(Default)]
+    struct Spy {
+        consumed: Mutex<Vec<usize>>,
+        flushes: Mutex<usize>,
     }
 
-    #[test]
-    fn compressed_output_decodes_to_the_plain_rows_including_empty_results() {
-        let mut config = collision_config();
-        for delta_g in [-5.0, -1000.0] {
-            config.filter.delta_g = Energy::from_kcal(delta_g);
-            let mut plain = search_to_lines(&QUERIES, &TARGETS, &config);
-            plain.sort();
-            assert_eq!(!plain.is_empty(), delta_g > -1000.0);
-            for compress in [OutputCompression::Gzip(6), OutputCompression::Zstd(3)] {
-                let output = OutputConfig {
-                    compress,
-                    ..minimal_output()
-                };
-                let out = tempfile::NamedTempFile::new().unwrap();
-                search_to_path(&QUERIES, &TARGETS, &config, &output, out.path());
-                let bytes = fs_err::read(out.path()).unwrap();
-                let decoded = match compress {
-                    OutputCompression::Gzip(_) => {
-                        assert!(bytes.starts_with(&[0x1f, 0x8b]));
-                        let mut text = String::new();
-                        flate2::read::MultiGzDecoder::new(bytes.as_slice())
-                            .read_to_string(&mut text)
-                            .unwrap();
-                        text
-                    }
-                    OutputCompression::Zstd(_) => {
-                        assert!(bytes.starts_with(&[0x28, 0xb5, 0x2f, 0xfd]));
-                        String::from_utf8(zstd::stream::decode_all(bytes.as_slice()).unwrap())
-                            .unwrap()
-                    }
-                    OutputCompression::None => unreachable!(),
-                };
-                let mut rows: Vec<String> = decoded
-                    .lines()
-                    .filter(|l| !l.trim().is_empty())
-                    .map(str::to_string)
-                    .collect();
-                rows.sort();
-                assert_eq!(rows, plain, "{compress:?} delta_g={delta_g}");
-            }
+    impl HitSink for Spy {
+        fn consume(&self, query_idx: usize, hits: Vec<SearchHit>) -> Result<()> {
+            assert!(hits
+                .iter()
+                .all(|hit| usize::try_from(hit.query_idx).unwrap() == query_idx));
+            self.consumed.lock().unwrap().push(query_idx);
+            Ok(())
+        }
+
+        fn flush(&self) -> Result<()> {
+            *self.flushes.lock().unwrap() += 1;
+            Ok(())
         }
     }
 
-    /// The sink is built before the search validates the config, so it must not
-    /// touch its destination until the driver hands it something.
-    #[test]
-    fn rejected_config_leaves_no_multifile_directory() {
-        let config = config(|c| c.extend.max_extension = -1);
-        let output = OutputConfig {
-            multifile: true,
-            ..detailed_output()
-        };
-        let queries = records(&[("longq", &"A".repeat(MAX_EXT + 1))]);
-
-        let tmp = tempfile::tempdir().unwrap();
-        let dir = tmp.path().join("multi");
-        let sink = TextSink::new(&queries, &TARGETS, &output, &dir).unwrap();
-        assert!(run_search(&queries, &TARGETS, &config, &sink).is_err());
-        assert!(!dir.exists());
-    }
-
-    /// Multifile addresses its writers by index (`paths[query_idx]`) while queries
-    /// that produce nothing get no file at all, so a query dropping out in the
-    /// middle must not shift the others' rows into the wrong file.
-    #[test]
-    fn multifile_writes_each_querys_rows_to_its_own_file() {
-        let queries = records(&[("q1", "AAAA"), ("q2", "CCCC"), ("q3", "AAAAA")]);
-        let targets = TargetRegistry::build(records(&[("t", "UUUUUUUU")]), None).unwrap();
-        let config = config(|c| {
-            c.seed.seed_length = Some(4);
-            c.extend.max_extension = 0;
-            c.extend.build_alignment = false;
-            c.filter.delta_g = Energy::from_kcal(100.0);
-        });
-        let output = OutputConfig {
-            multifile: true,
-            ..minimal_output()
-        };
-
-        let run_with_workers = |workers: usize| {
-            let tmp = tempfile::tempdir().unwrap();
-            let pool = rayon::ThreadPoolBuilder::new()
-                .num_threads(workers)
-                .build()
-                .unwrap();
-            pool.install(|| search_to_path(&queries, &targets, &config, &output, tmp.path()));
-            let mut files: Vec<(String, String)> = fs_err::read_dir(tmp.path())
-                .unwrap()
-                .map(|entry| {
-                    let path = entry.unwrap().path();
-                    let stem = path.file_stem().unwrap().to_string_lossy().into_owned();
-                    let mut lines: Vec<String> = fs_err::read_to_string(&path)
-                        .unwrap()
-                        .lines()
-                        .map(str::to_owned)
-                        .collect();
-                    lines.sort();
-                    (stem, lines.join("\n"))
-                })
-                .collect();
-            files.sort();
-            files
-        };
-        let files = run_with_workers(1);
-        assert_eq!(
-            files,
-            run_with_workers(4),
-            "multifile output changed across worker counts"
-        );
-
-        let stems: Vec<&str> = files.iter().map(|(stem, _)| stem.as_str()).collect();
-        assert_eq!(stems, ["q1", "q3"], "only queries with hits get a file");
-        for (stem, body) in &files {
-            assert!(!body.trim().is_empty(), "{stem} file is empty");
-            for line in body.lines() {
-                assert_eq!(
-                    line.split('\t').next().unwrap(),
-                    stem,
-                    "row landed in the wrong query's file"
-                );
-            }
-        }
-    }
-
-    /// The [`HitSink`] contract the in-tree sinks depend on: every query
-    /// is consumed exactly once, and every hit in a batch carries the
-    /// `query_idx` handed alongside it (multifile picks its file from that index,
-    /// single-file looks up the query's name and sequence).
-    #[test]
-    fn streaming_consumes_each_query_once_with_matching_hit_indices() {
-        #[derive(Default)]
-        struct Spy(Mutex<Vec<usize>>);
-
-        impl HitSink for Spy {
-            fn consume(&self, query_idx: usize, hits: Vec<SearchHit>) -> Result<()> {
-                assert!(hits
-                    .iter()
-                    .all(|hit| usize::try_from(hit.query_idx).unwrap() == query_idx));
-                self.0.lock().unwrap().push(query_idx);
-                Ok(())
-            }
-        }
-
-        let config = collision_config();
+    /// The [`HitSink`] contract the in-tree sinks depend on: every query is
+    /// consumed exactly once, every hit in a batch carries the `query_idx`
+    /// handed alongside it, and the sink is flushed once at the end, hits or not.
+    #[rstest]
+    #[case::with_hits(collision_config())]
+    #[case::without_hits(config(|c| c.filter.delta_g = Energy::from_kcal(-100.0)))]
+    fn driver_consumes_each_query_once_then_flushes(#[case] config: SearchConfig) {
         let spy = Spy::default();
         run_search(&QUERIES, &TARGETS, &config, &spy).unwrap();
 
-        let mut seen = spy.0.into_inner().unwrap();
-        seen.sort_unstable();
-        assert_eq!(seen, (0..QUERIES.len()).collect::<Vec<_>>());
+        let mut consumed = spy.consumed.into_inner().unwrap();
+        consumed.sort_unstable();
+        assert_eq!(consumed, (0..QUERIES.len()).collect::<Vec<_>>());
+        assert_eq!(spy.flushes.into_inner().unwrap(), 1);
     }
 
-    /// Search into a text file at `path` (a directory under `--multifile`),
-    /// returning the hit count. The sink dies here, so the caller reads a file
-    /// whose compression trailer is already written.
-    fn search_to_path(
-        queries: &[(String, Sequence)],
-        targets: &TargetRegistry,
-        config: &SearchConfig,
-        output: &OutputConfig,
-        path: &std::path::Path,
-    ) -> usize {
-        let sink = TextSink::new(queries, targets, output, path).unwrap();
-        run_search(queries, targets, config, &sink).unwrap()
-    }
+    /// The sink is built before the config is validated, so a rejected run
+    /// must not reach it.
+    #[test]
+    fn rejected_run_never_reaches_the_sink() {
+        let queries = records(&[("longq", &"A".repeat(MAX_EXT + 1))]);
+        let config = config(|c| c.extend.max_extension = -1);
+        let spy = Spy::default();
 
-    fn search_to_lines(
-        queries: &[(String, Sequence)],
-        targets: &TargetRegistry,
-        config: &SearchConfig,
-    ) -> Vec<String> {
-        let out = tempfile::NamedTempFile::with_suffix(".tsv").unwrap();
-        search_to_path(queries, targets, config, &minimal_output(), out.path());
-        fs_err::read_to_string(out.path())
-            .unwrap()
-            .lines()
-            .filter(|l| !l.trim().is_empty())
-            .map(str::to_string)
-            .collect()
+        assert!(run_search(&queries, &TARGETS, &config, &spy).is_err());
+        assert!(spy.consumed.into_inner().unwrap().is_empty());
+        assert_eq!(spy.flushes.into_inner().unwrap(), 0);
     }
 
     /// The fields dedup collapses on, within one query.
@@ -677,21 +485,6 @@ mod tests {
             hit.t_start,
             hit.t_end,
         )
-    }
-
-    fn collision_config() -> SearchConfig {
-        // Parameters that produce overlapping-seed box collisions on the
-        // corpus (~33% redundant rows): short seed, mismatches, wide window,
-        // permissive energy.
-        config(|c| {
-            c.seed.seed_length = Some(6);
-            c.seed.seed_wobble = true;
-            c.seed.max_mismatches = 2;
-            c.seed.min_suffix_matches = 0;
-            c.extend.max_extension = 30;
-            c.extend.build_alignment = false;
-            c.filter.delta_g = Energy::from_kcal(-5.0);
-        })
     }
 
     /// Default dedup keeps exactly one hit per bounding box, and that hit carries
