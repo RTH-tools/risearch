@@ -123,13 +123,11 @@ impl ScoringModel {
     /// physical target 3'→5', so paired positions advance together.
     pub(crate) fn ungapped_duplex_score(&self, query: &[Base], target: &[Base]) -> Energy {
         assert_eq!(query.len(), target.len());
-        Energy(
-            query
-                .windows(2)
-                .zip(target.windows(2))
-                .map(|(q, t)| self.score_bases(q[0], q[1], t[0], t[1]))
-                .sum(),
-        )
+        query
+            .windows(2)
+            .zip(target.windows(2))
+            .map(|(q, t)| Energy(self.score_bases(q[0], q[1], t[0], t[1])))
+            .fold(Energy(0), |total, stack| total + stack)
     }
 }
 
@@ -154,6 +152,17 @@ mod tests {
             model.ungapped_duplex_score(&[Base::A, Base::C, Base::G], &[Base::U, Base::G, Base::C]),
             Energy(28)
         );
+    }
+
+    #[test]
+    #[should_panic(expected = "Energy addition overflowed i32")]
+    fn ungapped_score_overflow_panics() {
+        let mut source = empty_source();
+        source[Base::G.as_usize()][Base::G.as_usize()][Base::C.as_usize()][Base::C.as_usize()] =
+            MAX_TRANSITION_SCORE as i32;
+        let model = ScoringModel::new(&source, Energy::from_kcal(0.0), Energy::from_kcal(0.0));
+
+        model.ungapped_duplex_score(&[Base::G; 1_800], &[Base::C; 1_800]);
     }
 
     #[test]
