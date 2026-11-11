@@ -663,11 +663,17 @@ mod tests {
             .collect()
     }
 
-    /// Split a Minimal-format row into (box key, energy). Energy is always the
-    /// last tab field; everything before it identifies the bounding box.
-    fn split_box_energy(line: &str) -> (&str, f64) {
-        let (key, energy) = line.rsplit_once('\t').unwrap();
-        (key, energy.parse().unwrap())
+    /// The fields dedup collapses on, within one query.
+    fn hit_box(hit: &SearchHit) -> (u32, u32, Strand, usize, usize, usize, usize) {
+        (
+            hit.query_idx,
+            hit.target_idx,
+            hit.strand,
+            hit.q_start,
+            hit.q_end,
+            hit.t_start,
+            hit.t_end,
+        )
     }
 
     fn collision_config() -> SearchConfig {
@@ -685,56 +691,35 @@ mod tests {
         })
     }
 
-    /// Default dedup keeps exactly one row per bounding box, and that row carries
+    /// Default dedup keeps exactly one hit per bounding box, and that hit carries
     /// the minimum energy among the box's collapsed candidates. `--no-dedup`
-    /// reproduces the full per-seed row set.
+    /// reproduces the full per-seed hit set.
     #[test]
-    fn dedup_keeps_one_min_energy_row_per_box() {
-        use std::collections::{HashMap, HashSet};
+    fn dedup_keeps_one_min_energy_hit_per_box() {
+        use std::collections::HashMap;
         let config = collision_config();
-
         let mut nodedup = config.clone();
         nodedup.filter.no_dedup = true;
-        let raw = search_to_lines(&QUERIES, &TARGETS, &nodedup);
-        let dedup = search_to_lines(&QUERIES, &TARGETS, &config);
 
+        let raw = search(&QUERIES, &TARGETS, &nodedup).unwrap();
+        let dedup = search(&QUERIES, &TARGETS, &config).unwrap();
         assert!(!dedup.is_empty(), "corpus must yield hits");
         assert!(
             dedup.len() < raw.len(),
-            "dedup must remove overlapping rows"
+            "dedup must remove overlapping hits"
         );
 
-        let mut min_energy: HashMap<String, f64> = HashMap::new();
-        for l in &raw {
-            let (k, e) = split_box_energy(l);
+        let mut min_energy = HashMap::new();
+        for hit in &raw {
             min_energy
-                .entry(k.to_string())
-                .and_modify(|m| {
-                    if e < *m {
-                        *m = e;
-                    }
-                })
-                .or_insert(e);
+                .entry(hit_box(hit))
+                .and_modify(|energy| *energy = hit.energy.min(*energy))
+                .or_insert(hit.energy);
         }
+        let kept: HashMap<_, _> = dedup.iter().map(|hit| (hit_box(hit), hit.energy)).collect();
 
-        let mut seen = HashSet::new();
-        for l in &dedup {
-            let (k, e) = split_box_energy(l);
-            assert!(
-                seen.insert(k.to_string()),
-                "duplicate box survived dedup: {k}"
-            );
-            assert!(
-                (e - min_energy[k]).abs() < 1e-9,
-                "kept energy {e} is not the box minimum {} for {k}",
-                min_energy[k]
-            );
-        }
-        assert_eq!(
-            seen.len(),
-            min_energy.len(),
-            "dedup must keep exactly one row per distinct box"
-        );
+        assert_eq!(kept.len(), dedup.len(), "duplicate box survived dedup");
+        assert_eq!(kept, min_energy, "each box must keep its minimum energy");
     }
 
     /// The deduped set must be stable across runs. `dedup_hits` drains a HashMap,
@@ -744,12 +729,20 @@ mod tests {
     #[test]
     fn dedup_result_is_deterministic() {
         let config = collision_config();
-        let mut a = search_to_lines(&QUERIES, &TARGETS, &config);
-        let mut b = search_to_lines(&QUERIES, &TARGETS, &config);
-        a.sort();
-        b.sort();
-        assert!(!a.is_empty(), "corpus must yield hits");
-        assert_eq!(a, b, "deduped set must not depend on hash/iteration order");
+        let boxes = || {
+            let hits = search(&QUERIES, &TARGETS, &config).unwrap();
+            let mut boxes: Vec<_> = hits.iter().map(|hit| (hit_box(hit), hit.energy)).collect();
+            boxes.sort();
+            boxes
+        };
+
+        let first = boxes();
+        assert!(!first.is_empty(), "corpus must yield hits");
+        assert_eq!(
+            first,
+            boxes(),
+            "deduped set must not depend on hash/iteration order"
+        );
     }
 
     // Unlimited seed extension (`-l -1`).
