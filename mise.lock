@@ -3,19 +3,20 @@
 lockfile_version = 2
 
 [[tools.act]]
-version = "0.2.89"
+version = "0.2.97"
 backend = "aqua:nektos/act"
 specifiers = ["latest"]
 
 [tools.act."platforms.linux-x64"]
-checksum = "sha256:0191d6f1f3b716b5c55820032605d05fc3c1cdbf581ebeff655019e5dd1524c0"
-url = "https://github.com/nektos/act/releases/download/v0.2.89/act_Linux_x86_64.tar.gz"
-url_api = "https://api.github.com/repos/nektos/act/releases/assets/434891246"
+checksum = "sha256:67b4976a56f33ea7870b798912e738ec44eef38e7578ae7b532f2def1c73a5ad"
+checksum_source = "mise-versions"
+url = "https://github.com/nektos/act/releases/download/v0.2.97/act_Linux_x86_64.tar.gz"
+url_api = "https://api.github.com/repos/nektos/act/releases/assets/710157441"
 
 [tools.act."platforms.macos-arm64"]
-checksum = "sha256:48ae218af96725f7635a66de2b87e1e346893b02add0f16b92f560296b2151fc"
-url = "https://github.com/nektos/act/releases/download/v0.2.89/act_Darwin_arm64.tar.gz"
-url_api = "https://api.github.com/repos/nektos/act/releases/assets/434891257"
+checksum = "sha256:6dbb1ef34a7e34bb1ee0db188d1682ea35b82d9d9012626497f6c659e55a7cb5"
+url = "https://github.com/nektos/act/releases/download/v0.2.97/act_Darwin_arm64.tar.gz"
+url_api = "https://api.github.com/repos/nektos/act/releases/assets/710157431"
 
 [[tools."aqua:rhysd/actionlint"]]
 version = "1.7.12"
@@ -40,12 +41,12 @@ backend = "cargo:cargo-deny"
 specifiers = ["latest"]
 
 [[tools."cargo:cargo-edit"]]
-version = "0.13.13"
+version = "0.13.14"
 backend = "cargo:cargo-edit"
 specifiers = ["latest"]
 
 [[tools."cargo:cargo-hack"]]
-version = "0.6.45"
+version = "0.6.46"
 backend = "cargo:cargo-hack"
 specifiers = ["latest"]
 
@@ -55,12 +56,12 @@ backend = "cargo:cargo-llvm-cov"
 specifiers = ["latest"]
 
 [[tools."cargo:cargo-minimal-versions"]]
-version = "0.1.37"
+version = "0.1.38"
 backend = "cargo:cargo-minimal-versions"
 specifiers = ["latest"]
 
 [[tools."cargo:cargo-msrv"]]
-version = "0.19.3"
+version = "0.19.6"
 backend = "cargo:cargo-msrv"
 specifiers = ["latest"]
 
@@ -70,7 +71,7 @@ backend = "cargo:cargo-mutants"
 specifiers = ["latest"]
 
 [[tools."cargo:cargo-nextest"]]
-version = "0.9.146"
+version = "0.9.151"
 backend = "cargo:cargo-nextest"
 specifiers = ["latest"]
 
@@ -80,7 +81,7 @@ backend = "cargo:cargo-outdated"
 specifiers = ["latest"]
 
 [[tools."cargo:cargo-release"]]
-version = "1.1.6"
+version = "1.1.7"
 backend = "cargo:cargo-release"
 specifiers = ["latest"]
 
@@ -90,7 +91,7 @@ backend = "cargo:cargo-semver-checks"
 specifiers = ["latest"]
 
 [[tools."cargo:cargo-show-asm"]]
-version = "0.2.63"
+version = "0.2.64"
 backend = "cargo:cargo-show-asm"
 specifiers = ["latest"]
 
@@ -105,53 +106,53 @@ backend = "cargo:kani-verifier"
 specifiers = ["latest"]
 
 [[tools.hk]]
-version = "2.5.0"
+version = "2.12.0"
 backend = "packslip:github.com/jdx/hk"
 specifiers = ["latest"]
 
 [tools.hk."platforms.linux-x64"]
-checksum = "sha256:449b83c35ac3a460f80a4c9a41ad99430add8cf6caa6ceadc27e810feac3647d"
-url = "https://github.com/jdx/hk/releases/download/v2.5.0/hk-x86_64-unknown-linux-gnu.tar.gz"
+checksum = "sha256:db98f893b882f064c1f7abcc96f4ccc31e8154fd1ba0f7f94823d371c2c4fdad"
+url = "https://github.com/jdx/hk/releases/download/v2.12.0/hk-x86_64-unknown-linux-gnu.tar.gz"
 signer = "sigstore-oidc:https://github.com/jdx/hk/.github/workflows/release.yml"
 
 [tools.hk."platforms.macos-arm64"]
-checksum = "sha256:fabbed3a44e72c601759fa81d56f3c9403ca466853bdf77e87cc69d986cb151a"
-url = "https://github.com/jdx/hk/releases/download/v2.5.0/hk-aarch64-apple-darwin.tar.gz"
+checksum = "sha256:269c17d47e884c19adb77144d5957e854fc5fc6a1a6f9c1a0a5b19431e2fabb8"
+url = "https://github.com/jdx/hk/releases/download/v2.12.0/hk-aarch64-apple-darwin.tar.gz"
 signer = "sigstore-oidc:https://github.com/jdx/hk/.github/workflows/release.yml"
 
 [[tools.python]]
-version = "3.11.17"
+version = "3.11.18"
 backend = "core:python"
 specifiers = ["3.11"]
 
 [tools.python."platforms.linux-x64"]
-checksum = "sha256:7086a336e6ea0a49595cf891066ab6517156c85116f77fbc23b62c1d9e9b7d92"
-url = "https://github.com/astral-sh/python-build-standalone/releases/download/20261001/cpython-3.11.17+20261001-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz"
+checksum = "sha256:17c4978a36c496dc53c08899ef8dad1ad2734f6325f08d6033a1e66419e0af26"
+url = "https://github.com/astral-sh/python-build-standalone/releases/download/20261026/cpython-3.11.18+20261026-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz"
 provenance = "github-attestations"
 
 [tools.python."platforms.macos-arm64"]
-checksum = "sha256:7fa8ccd24b93b2feacd08bfc4d2b2d0f5864a0105d90919c0644042ff9f2219d"
-url = "https://github.com/astral-sh/python-build-standalone/releases/download/20261001/cpython-3.11.17+20261001-aarch64-apple-darwin-install_only_stripped.tar.gz"
+checksum = "blake3:16bf7ad2dc2cd27943d85f8f7736811a48114cd9c2ea1f3484ed240e7d1ba9e3"
+url = "https://github.com/astral-sh/python-build-standalone/releases/download/20261026/cpython-3.11.18+20261026-aarch64-apple-darwin-install_only_stripped.tar.gz"
 provenance = "github-attestations"
 
 [[tools.rust]]
-version = "1.99.0"
+version = "1.99.1"
 backend = "core:rust"
 specifiers = ["latest"]
 
 [[tools.uv]]
-version = "0.12.23"
+version = "0.13.7"
 backend = "aqua:astral-sh/uv"
 specifiers = ["latest"]
 
 [tools.uv."platforms.linux-x64"]
-checksum = "sha256:9167d72b3319674b6303c4cbe071854bba13ebdf3d76b1a7cbdc175471fb66d6"
-url = "https://github.com/astral-sh/uv/releases/download/0.12.23/uv-x86_64-unknown-linux-gnu.tar.gz"
-url_api = "https://api.github.com/repos/astral-sh/uv/releases/assets/608232628"
+checksum = "sha256:c5221ff41b7892bfc223543883600125f6a47fe845093e0f5bdff4f359196d83"
+url = "https://github.com/astral-sh/uv/releases/download/0.13.7/uv-x86_64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/astral-sh/uv/releases/assets/704009823"
 provenance = "github-attestations"
 
 [tools.uv."platforms.macos-arm64"]
-checksum = "sha256:50487ae565ccd96e499056b4674d438f4c53170202617b4c759defe0c6a1b544"
-url = "https://github.com/astral-sh/uv/releases/download/0.12.23/uv-aarch64-apple-darwin.tar.gz"
-url_api = "https://api.github.com/repos/astral-sh/uv/releases/assets/608232483"
+checksum = "sha256:81b811b57e4624df7ed3aac148e0359100d9962f3d9dce00aec533dc2e086731"
+url = "https://github.com/astral-sh/uv/releases/download/0.13.7/uv-aarch64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/astral-sh/uv/releases/assets/704009442"
 provenance = "github-attestations"
