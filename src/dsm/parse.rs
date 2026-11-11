@@ -1,6 +1,7 @@
 //! Parse a user-provided long-form DSM TSV into an initiation offset and table.
 
 use super::{DsmTable, DSM_HEADER};
+use crate::dp::MAX_TRANSITION_SCORE;
 use crate::error::{Error, Result};
 use crate::types::{Base, Energy, BASE_COUNT};
 
@@ -39,6 +40,12 @@ pub(crate) fn parse_tsv(input: &str) -> Result<(Energy, DsmTable)> {
         let dg: f64 = dg
             .parse()
             .map_err(|e| Error::Dsm(format!("line {row}: invalid energy '{dg}': {e}")))?;
+        if Energy::try_from(-dg).is_ok_and(|e| i64::from(e.0) > MAX_TRANSITION_SCORE) {
+            return Err(Error::Dsm(format!(
+                "line {row}: energy {dg} is below the minimum of -{} kcal/mol",
+                Energy(MAX_TRANSITION_SCORE as i32)
+            )));
+        }
         let cell = &mut cells[q1.as_usize()][q2.as_usize()][t1.as_usize()][t2.as_usize()];
         if cell.is_some() {
             return Err(Error::Dsm(format!(
@@ -144,6 +151,7 @@ mod tests {
             &format!("{HEADER}AC\tC\tU\tG\t-1.0\n"),
             &format!("{HEADER}A\tC\tU\tG\tabc\n"),
             &format!("{HEADER}A\tC\tU\tG\t-1.0\nA\tC\tU\tG\t-2.0\n"),
+            &format!("{HEADER}A\tC\tU\tG\t-2180.5\nA\t-\tU\t-\t3.0\n"),
         ];
         for tsv in bad {
             assert!(matches!(parse_tsv(tsv), Err(Error::Dsm(_))), "{tsv:?}");
