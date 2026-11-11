@@ -929,7 +929,13 @@ mod tests {
     }
 
     fn complement(base: char) -> char {
-        char::from(Base::try_from(base).unwrap().complement().to_u8_upper())
+        char::from(
+            Base::try_from(base)
+                .unwrap()
+                .complement()
+                .to_byte()
+                .to_ascii_uppercase(),
+        )
     }
 
     /// Reverse complement, so `revcomp(q)` forms a full antiparallel duplex with `q`.
@@ -1170,7 +1176,7 @@ mod tests {
                 config.filter.delta_g = Energy(threshold);
                 let mut planted: Vec<_> = target.iter().map(|&b| alphabet[b]).collect();
                 let site = offset % (planted.len() - length + 1);
-                let complement = |b| Base::try_from(char::from(b)).unwrap().complement().to_u8_upper();
+                let complement = |b| Base::try_from(char::from(b)).unwrap().complement().to_byte().to_ascii_uppercase();
                 let mut duplex: Vec<_> = q[start..start + length].iter().copied().map(complement).collect();
                 // Forward FASTA is reverse(physical); reverse FASTA is complement(physical).
                 if reverse { duplex.iter_mut().for_each(|b| *b = complement(*b)); }

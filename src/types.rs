@@ -22,9 +22,6 @@ pub enum Base {
     U = 5,
 }
 
-/// Base → uppercase ASCII byte
-static BASE_TO_UPPER: [u8; 6] = *b"-ACGNU";
-
 /// Base → lowercase ASCII byte (for to_byte())
 static BASE_TO_BYTE: [u8; 6] = *b"-acgnu";
 
@@ -69,12 +66,6 @@ impl Base {
     #[inline]
     pub const fn as_u8(self) -> u8 {
         self as u8
-    }
-
-    /// Get standard uppercase ASCII byte (A, G, C, U, N)
-    #[inline]
-    pub fn to_u8_upper(self) -> u8 {
-        BASE_TO_UPPER[self.as_usize()]
     }
 
     /// Convert Base to lowercase ASCII byte (a, g, c, t, n, -)
@@ -337,16 +328,6 @@ mod tests {
     #[should_panic(expected = "invalid base rank 6")]
     fn from_u8_rejects_ranks_beyond_the_alphabet() {
         Base::from_u8(6);
-    }
-
-    #[test]
-    fn upper_bytes_are_the_display_alphabet() {
-        assert_eq!(Base::Gap.to_u8_upper(), b'-');
-        assert_eq!(Base::A.to_u8_upper(), b'A');
-        assert_eq!(Base::C.to_u8_upper(), b'C');
-        assert_eq!(Base::G.to_u8_upper(), b'G');
-        assert_eq!(Base::N.to_u8_upper(), b'N');
-        assert_eq!(Base::U.to_u8_upper(), b'U');
     }
 
     #[test]
