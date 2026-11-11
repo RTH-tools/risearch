@@ -204,12 +204,6 @@ impl TryFrom<f64> for Energy {
     }
 }
 
-impl From<Energy> for f64 {
-    fn from(e: Energy) -> Self {
-        e.to_kcal()
-    }
-}
-
 impl std::str::FromStr for Energy {
     type Err = String;
 
@@ -405,7 +399,7 @@ mod tests {
         assert_eq!(Energy::try_from(-0.00006), Ok(Energy(-1)));
         assert_eq!(Energy::try_from(0.00004), Ok(Energy(0)));
         assert_eq!(Energy::from_kcal(-1.2345).to_kcal(), -1.2345);
-        assert_eq!(f64::from(Energy(-12345)), -1.2345);
+        assert_eq!(Energy(-12345).to_kcal(), -1.2345);
     }
 
     #[test]

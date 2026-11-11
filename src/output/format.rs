@@ -92,7 +92,7 @@ fn write_base_fields(
     row.field(itoa.format(hit.t_start + 1).as_bytes());
     row.field(itoa.format(hit.t_end + 1).as_bytes());
     row.field(&[char::from(hit.strand) as u8]);
-    row.field_with(|buf| append_score_2dp(buf, itoa, f64::from(hit.energy)));
+    row.field_with(|buf| append_score_2dp(buf, itoa, hit.energy.to_kcal()));
 }
 
 #[inline(always)]

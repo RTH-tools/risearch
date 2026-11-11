@@ -106,7 +106,7 @@ impl HitSink for ArrowSink<'_> {
             c.t_end.append_value(h.t_end as u64);
             c.strand
                 .append_value(char::from(h.strand).encode_utf8(&mut strand_buf));
-            c.energy.append_value(f64::from(h.energy));
+            c.energy.append_value(h.energy.to_kcal());
             match alignment {
                 Some(a) => c.alignment.append_value(a),
                 None => c.alignment.append_null(),

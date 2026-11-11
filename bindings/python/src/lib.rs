@@ -320,16 +320,16 @@ fn _default_options(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
     d.set_item("seed_length", seed.seed_length)?;
     d.set_item("seed_start", seed.seed_start)?;
     d.set_item("seed_end", seed.seed_end)?;
-    d.set_item("energy_threshold", f64::from(filter.delta_g))?;
+    d.set_item("energy_threshold", filter.delta_g.to_kcal())?;
     d.set_item("mismatches", seed.max_mismatches)?;
     d.set_item("mismatch_prefix", seed.min_prefix_matches)?;
     d.set_item("mismatch_suffix", seed.min_suffix_matches)?;
     d.set_item("seed_wobble", seed.seed_wobble)?;
     d.set_item("matrix", score.dsm_id.0)?;
-    d.set_item("penalty", f64::from(score.penalty))?;
+    d.set_item("penalty", score.penalty.to_kcal())?;
     d.set_item("temperature", None::<i32>)?;
     d.set_item("max_extension", extend.max_extension)?;
-    d.set_item("seed_energy", f64::from(filter.seed_energy))?;
+    d.set_item("seed_energy", filter.seed_energy.to_kcal())?;
     d.set_item("no_max_prune", seed.no_max_prune)?;
     d.set_item("no_dedup", filter.no_dedup)?;
     Ok(d)
