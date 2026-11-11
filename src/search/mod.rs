@@ -931,7 +931,7 @@ mod tests {
         max_extension: i32,
     ) -> std::result::Result<Vec<SearchHit>, String> {
         let cfg = config(max_extension);
-        let (target_seq, _) = Sequence::normalize("target", target.as_bytes()).unwrap();
+        let target_seq = Sequence::try_from(target.as_bytes()).unwrap();
         let store = TargetRegistry::build(vec![("target".to_string(), target_seq)], None).unwrap();
         let queries =
             read_sequences_from(format!(">query\n{query}\n").as_bytes(), "inline").unwrap();
@@ -1046,7 +1046,7 @@ mod tests {
         target_text: &str,
         config: &SearchConfig,
     ) -> Vec<SearchHit> {
-        let (target, _) = Sequence::normalize("t", target_text.as_bytes()).unwrap();
+        let target = Sequence::try_from(target_text.as_bytes()).unwrap();
         let queries =
             read_sequences_from(format!(">q\n{query_text}\n").as_bytes(), "inline").unwrap();
         let targets = TargetRegistry::build(vec![("t".into(), target)], None).unwrap();
@@ -1073,7 +1073,7 @@ mod tests {
     fn map_target_range_matches_independent_coordinate_oracle() {
         let target_text = "ACGUACGUACGU";
         let target_len = target_text.len();
-        let (target, _) = Sequence::normalize("t", target_text.as_bytes()).unwrap();
+        let target = Sequence::try_from(target_text.as_bytes()).unwrap();
         let targets = TargetRegistry::build(vec![("t".into(), target)], None).unwrap();
         let tview = targets.view();
 

@@ -147,7 +147,7 @@ fn assert_seeds_match_enumeration(
             .enumerate()
             .map(|(i, t)| {
                 let name = format!("t{i}");
-                let (seq, _) = Sequence::normalize(&name, t.as_bytes()).unwrap();
+                let seq = Sequence::try_from(t.as_bytes()).unwrap();
                 (name, seq)
             })
             .collect(),
@@ -156,7 +156,7 @@ fn assert_seeds_match_enumeration(
     .unwrap();
     let engine = super::SeedingEngine::new(&queries_registry, &targets_registry);
     for (query_index, query) in queries.iter().enumerate() {
-        let (query_bases, _) = Sequence::normalize("query", query.as_bytes()).unwrap();
+        let query_bases = Sequence::try_from(query.as_bytes()).unwrap();
         let bounds = query_interval.clone().unwrap_or(0..query_bases.len());
         // The public default is six bases, clamped only for shorter queries.
         // An explicitly selected interval instead supplies its whole width.
@@ -168,7 +168,7 @@ fn assert_seeds_match_enumeration(
         };
         let mut expected = Vec::new();
         for (target_index, target) in targets.iter().enumerate() {
-            let (target_bases, _) = Sequence::normalize("target", target.as_bytes()).unwrap();
+            let target_bases = Sequence::try_from(target.as_bytes()).unwrap();
             for strand in [Strand::Forward, Strand::Reverse] {
                 let physical = target_in_duplex_order(&target_bases, strand);
                 expected.extend(

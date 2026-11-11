@@ -4,11 +4,8 @@
 //! ensuring sequences are normalized once at the input boundary and then
 //! work with Base enums throughout the codebase.
 
-use crate::error::Result;
 use crate::types::Base;
 use std::ops::{Deref, Index, Range, RangeFrom, RangeFull, RangeTo};
-
-use super::normalize::{normalize_rna_sequence, NormalizationStats};
 
 /// A normalized RNA sequence stored as Vec<Base>.
 ///
@@ -18,23 +15,6 @@ use super::normalize::{normalize_rna_sequence, NormalizationStats};
 pub struct Sequence(Vec<Base>);
 
 impl Sequence {
-    /// Normalize raw FASTA bytes into a Sequence.
-    ///
-    /// This is the only place where ASCII→Base conversion happens.
-    /// Input bytes are validated and converted to uppercase Base values,
-    /// with gaps removed and ambiguous bases mapped to N.
-    ///
-    /// # Arguments
-    /// * `id` - Sequence identifier (for error messages)
-    /// * `raw` - Raw FASTA sequence bytes
-    ///
-    /// # Returns
-    /// A normalized Sequence and statistics about the normalization process
-    pub fn normalize(id: &str, raw: &[u8]) -> Result<(Self, NormalizationStats)> {
-        let (bases, stats) = normalize_rna_sequence(id, raw)?;
-        Ok((Self(bases), stats))
-    }
-
     /// Length of the sequence
     #[inline]
     pub fn len(&self) -> usize {
@@ -115,6 +95,26 @@ impl Index<RangeFull> for Sequence {
     }
 }
 
+/// Normalizes raw sequence text: case is folded, `T` reads as `U`, `-` and `.`
+/// are dropped, any other letter becomes `N`, and any other byte is an error.
+impl TryFrom<&[u8]> for Sequence {
+    type Error = String;
+
+    fn try_from(raw: &[u8]) -> Result<Self, Self::Error> {
+        let mut bases = Vec::with_capacity(raw.len());
+        for &b in raw {
+            match Base::try_from(b as char) {
+                Ok(Base::Gap) => {}
+                Ok(base) => bases.push(base),
+                Err(_) if b == b'.' => {}
+                Err(_) if b.is_ascii_alphabetic() => bases.push(Base::N),
+                Err(_) => return Err(format!("byte=0x{b:02X} ('{}')", b as char)),
+            }
+        }
+        Ok(Self(bases))
+    }
+}
+
 impl From<Vec<Base>> for Sequence {
     fn from(bases: Vec<Base>) -> Self {
         Self(bases)
@@ -128,37 +128,29 @@ mod tests {
 
     #[test]
     fn normalize_folds_case_and_maps_t_to_u() {
-        let (seq, stats) = Sequence::normalize("test", b"aCgUtN").unwrap();
+        let seq = Sequence::try_from(b"aCgUtN".as_slice()).unwrap();
         assert_eq!(
             &*seq,
             &[Base::A, Base::C, Base::G, Base::U, Base::U, Base::N]
         );
-        assert_eq!(stats.removed_gaps, 0);
-        assert_eq!(stats.converted_to_n, 0);
     }
 
     #[rstest]
     #[case::gaps_between_bases(b"AC-.GU", &[Base::A, Base::C, Base::G, Base::U])]
     #[case::only_gaps(b"-.", &[])]
-    fn normalize_strips_gaps_and_counts_them(#[case] raw: &[u8], #[case] expected: &[Base]) {
-        let (seq, stats) = Sequence::normalize("test", raw).unwrap();
+    fn normalize_strips_gaps(#[case] raw: &[u8], #[case] expected: &[Base]) {
+        let seq = Sequence::try_from(raw).unwrap();
         assert_eq!(&*seq, expected);
-        assert_eq!(stats.removed_gaps, 2);
     }
 
-    // Alphabetic ambiguity is deliberately accepted and accounted for;
+    // Alphabetic ambiguity is deliberately accepted;
     // punctuation/non-ASCII bytes are rejected by a separate contract.
     #[rstest]
-    #[case::single_code(b"ACRGU", &[Base::A, Base::C, Base::N, Base::G, Base::U], 1)]
-    #[case::every_code(b"RYSWKMBDHVXZJryswkmbdhvxzj", &[Base::N; 26], 26)]
-    fn normalize_converts_ambiguous_to_n(
-        #[case] raw: &[u8],
-        #[case] expected: &[Base],
-        #[case] converted: usize,
-    ) {
-        let (seq, stats) = Sequence::normalize("ambiguities", raw).unwrap();
+    #[case::single_code(b"ACRGU", &[Base::A, Base::C, Base::N, Base::G, Base::U])]
+    #[case::every_code(b"RYSWKMBDHVXZJryswkmbdhvxzj", &[Base::N; 26])]
+    fn normalize_converts_ambiguous_to_n(#[case] raw: &[u8], #[case] expected: &[Base]) {
+        let seq = Sequence::try_from(raw).unwrap();
         assert_eq!(&*seq, expected);
-        assert_eq!(stats.converted_to_n, converted);
     }
 
     #[rstest]
@@ -166,17 +158,14 @@ mod tests {
     #[case::digit(b'1')]
     #[case::nul(0)]
     #[case::high_byte(0xff)]
-    fn normalize_rejects_non_base_bytes_with_record_context(#[case] byte: u8) {
-        let error = Sequence::normalize("bad-record", &[byte]).unwrap_err();
-        assert!(matches!(error, crate::Error::Input(_)));
-        let message = error.to_string();
-        assert!(message.contains("bad-record"));
+    fn rejects_non_base_bytes(#[case] byte: u8) {
+        let message = Sequence::try_from([byte].as_slice()).unwrap_err();
         assert!(message.contains(&format!("0x{byte:02X}")));
     }
 
     #[test]
     fn deref_coercion_to_slice() {
-        let (seq, _) = Sequence::normalize("test", b"ACGU").unwrap();
+        let seq = Sequence::try_from(b"ACGU".as_slice()).unwrap();
         let slice: &[Base] = &seq; // Deref coercion
 
         assert_eq!(slice.len(), 4);
@@ -185,7 +174,7 @@ mod tests {
 
     #[test]
     fn indexing_returns_the_underlying_bases() {
-        let (seq, _) = Sequence::normalize("test", b"ACGU").unwrap();
+        let seq = Sequence::try_from(b"ACGU".as_slice()).unwrap();
 
         assert_eq!(seq.len(), 4);
         assert!(!seq.is_empty());
@@ -202,7 +191,7 @@ mod tests {
 
     #[test]
     fn iter_yields_all_bases() {
-        let (seq, _) = Sequence::normalize("test", b"ACG").unwrap();
+        let seq = Sequence::try_from(b"ACG".as_slice()).unwrap();
         let bases: Vec<Base> = seq.iter().copied().collect();
 
         assert_eq!(bases, vec![Base::A, Base::C, Base::G]);

@@ -1,11 +1,9 @@
-//! Sequence abstraction for clean base access.
+//! Stores sequences as normalized `Base` values.
 //!
-//! Normalized sequences are stored as Base enums (A/G/C/U/N/Gap).
-//! This module centralizes normalization so the rest of the repository relies
-//! on a single canonical representation.
+//! `Sequence` holds a `Vec<Base>`, where `Base` is A, C, G, U, N or Gap.
+//! `Sequence::try_from(&[u8])` normalizes raw bytes once, when they are read.
+//! Code elsewhere in the crate works on `Base` values, not on text.
 
-pub(crate) mod normalize;
 pub mod sequence;
 
-pub use normalize::NormalizationStats;
 pub use sequence::Sequence;

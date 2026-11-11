@@ -208,7 +208,7 @@ mod tests {
         records
             .iter()
             .map(|(name, seq)| {
-                let (sequence, _) = Sequence::normalize(name, seq.as_bytes()).unwrap();
+                let sequence = Sequence::try_from(seq.as_bytes()).unwrap();
                 (name.to_string(), sequence)
             })
             .collect()

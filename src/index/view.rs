@@ -142,7 +142,7 @@ mod tests {
     fn map_target_range_matches_independent_coordinate_oracle() {
         let target_text = "ACGUACGUACGU";
         let target_len = target_text.len();
-        let (target, _) = Sequence::normalize("t", target_text.as_bytes()).unwrap();
+        let target = Sequence::try_from(target_text.as_bytes()).unwrap();
         let targets = TargetRegistry::build(vec![("t".into(), target)], None).unwrap();
         let tview = targets.view();
 

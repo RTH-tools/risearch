@@ -71,29 +71,30 @@ pub fn read_sequences_from(
     Ok(sequences)
 }
 
-/// Normalizes a raw sequence and handles logging for gaps/N-conversions.
+/// Normalizes a raw sequence.
 /// Returns `Ok(None)` if the sequence is entirely empty after normalization.
 fn normalize_record(id: &str, raw_seq: &[u8]) -> Result<Option<Sequence>> {
-    let (sequence, stats) = Sequence::normalize(id, raw_seq)?;
+    let sequence = Sequence::try_from(raw_seq)
+        .map_err(|err| Error::Input(format!("Invalid character in sequence '{id}': {err}")))?;
 
     if sequence.is_empty() {
-        log::warn!(
-            "Skipping empty sequence after normalization: '{}' (removed_gaps={}, converted_to_n={})",
-            id,
-            stats.removed_gaps,
-            stats.converted_to_n
-        );
+        log::warn!("Skipping empty sequence after normalization: '{id}'");
         return Ok(None);
     }
 
-    if stats.removed_gaps > 0 || stats.converted_to_n > 0 {
-        log::debug!(
-            "Normalized sequence '{}': removed_gaps={}, converted_to_n={}",
-            id,
-            stats.removed_gaps,
-            stats.converted_to_n
-        );
-    }
-
     Ok(Some(sequence))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn invalid_byte_error_names_the_record() {
+        let message = normalize_record("bad-record", b"AC?")
+            .unwrap_err()
+            .to_string();
+        assert!(message.contains("bad-record"));
+        assert!(message.contains("0x3F"));
+    }
 }
