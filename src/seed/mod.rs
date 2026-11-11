@@ -18,7 +18,6 @@ use crate::types::{Base, Strand};
 /// always have the same non-zero length.
 #[derive(Debug, Clone)]
 pub struct SeedHit {
-    query_idx: usize,
     query_start: usize,
     target_idx: usize,
     target_start: usize,
@@ -28,7 +27,6 @@ pub struct SeedHit {
 
 impl SeedHit {
     pub(crate) fn new(
-        query_idx: usize,
         query_start: usize,
         target_idx: usize,
         target_start: usize,
@@ -37,19 +35,12 @@ impl SeedHit {
     ) -> Self {
         debug_assert!(len > 0, "seed matches must be non-empty");
         Self {
-            query_idx,
             query_start,
             target_idx,
             target_start,
             len,
             strand,
         }
-    }
-
-    /// Index of the query in its registry.
-    #[inline]
-    pub(crate) fn query_idx(&self) -> usize {
-        self.query_idx
     }
 
     /// Half-open range in the full query sequence.

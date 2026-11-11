@@ -1,11 +1,11 @@
 use crate::config::SeedConfig;
 use crate::error::{Error, Result};
-use crate::index::sa::{SuffixIndex, SuffixIndexView};
+use crate::index::sa::SuffixIndex;
 use crate::index::store::TargetRegistry;
 use crate::index::TargetView;
 use crate::registry::{Query, QueryRegistry};
 
-use super::parallel_sa::{traverse, SeedMatch};
+use super::parallel_sa::traverse;
 use super::SeedHit;
 
 pub struct SeedingEngine<'a> {
@@ -49,23 +49,18 @@ impl<'a> SeedingEngine<'a> {
         // `traverse` is monomorphized on whether G-U wobble pairs are allowed.
         let query = &self.queries[qi];
         if config.seed_wobble {
-            self.seed_one::<true, _>(qi, query, config, &mut on_seed)
+            self.seed_one::<true, _>(query, config, &mut on_seed)
         } else {
-            self.seed_one::<false, _>(qi, query, config, &mut on_seed)
+            self.seed_one::<false, _>(query, config, &mut on_seed)
         }
     }
 
     fn seed_one<const WOBBLE: bool, F: FnMut(SeedHit)>(
         &self,
-        qi: usize,
         query: &Query,
         config: &SeedConfig,
         on_seed: &mut F,
     ) -> Result<()> {
-        // Returning here also skips the per-query suffix array build.
-        if query.min_seed_len > query.max_seed_len {
-            return Ok(());
-        }
         let tview = self.tview;
 
         let seed = query.seed_sequence();
@@ -77,6 +72,8 @@ impl<'a> SeedingEngine<'a> {
                 ))
             })?;
         let query_suffixes = prepared_query.view();
+        let query_bases = query.sequence();
+        let seed_interval = query.seed_interval();
 
         traverse::<WOBBLE, _>(
             query_suffixes,
@@ -87,65 +84,36 @@ impl<'a> SeedingEngine<'a> {
             config.min_prefix_matches,
             config.min_suffix_matches,
             &mut |m| {
-                emit_seed_match::<WOBBLE, _>(
-                    qi,
-                    query,
-                    query_suffixes,
-                    tview,
-                    config.no_max_prune,
-                    m,
-                    &mut *on_seed,
-                )
+                // Query SA positions are relative to the seed interval.
+                for &query_sa_pos in query_suffixes.suffix_positions(m.query_interval.clone()) {
+                    let query_start = seed_interval.start + query_sa_pos as usize;
+
+                    for &target_sa_pos in
+                        tview.suffixes().suffix_positions(m.target_interval.clone())
+                    {
+                        let Some((target_idx, strand, target_start)) =
+                            tview.map_seed_pos(target_sa_pos as usize, m.seed_len)
+                        else {
+                            continue;
+                        };
+
+                        let hit =
+                            SeedHit::new(query_start, target_idx, target_start, m.seed_len, strand);
+                        if config.no_max_prune
+                            || hit.is_maximal(
+                                query_bases,
+                                tview.target(target_idx, strand),
+                                &seed_interval,
+                                WOBBLE,
+                            )
+                        {
+                            on_seed(hit);
+                        }
+                    }
+                }
             },
         );
         Ok(())
-    }
-}
-
-/// Emit every (query position × target position) seed for one `SeedMatch` of a
-/// single query. Query positions come straight out of the single-query SA and
-/// are offset by the seed interval start; the target view maps its global
-/// suffix positions through the index directory.
-///
-/// Non-maximal seeds are dropped here unless `no_max_prune`: they are shorter
-/// copies of a longer match, so extending them only rediscovers the same duplex.
-fn emit_seed_match<const WOBBLE: bool, F: FnMut(SeedHit)>(
-    qi: usize,
-    query: &Query,
-    query_suffixes: SuffixIndexView<'_>,
-    tview: TargetView<'_>,
-    no_max_prune: bool,
-    raw_match: SeedMatch,
-    on_seed: &mut F,
-) {
-    let seed_len = raw_match.seed_len;
-    let query_bases = query.sequence();
-    let seed_interval = query.seed_interval();
-    for &query_sa_pos in query_suffixes.suffix_positions(raw_match.query_interval.clone()) {
-        let query_start = seed_interval.start + query_sa_pos as usize;
-
-        for &target_sa_pos in tview
-            .suffixes()
-            .suffix_positions(raw_match.target_interval.clone())
-        {
-            let Some((target_idx, strand, target_start)) =
-                tview.map_seed_pos(target_sa_pos as usize, seed_len)
-            else {
-                continue;
-            };
-
-            let hit = SeedHit::new(qi, query_start, target_idx, target_start, seed_len, strand);
-            if no_max_prune
-                || hit.is_maximal(
-                    query_bases,
-                    tview.target(target_idx, strand),
-                    &seed_interval,
-                    WOBBLE,
-                )
-            {
-                on_seed(hit);
-            }
-        }
     }
 }
 
@@ -195,7 +163,6 @@ mod tests {
         assert_eq!(groups[0].1.len(), 1);
 
         let seed = &groups[0].1[0];
-        assert_eq!(seed.query_idx(), 0);
         assert_eq!(seed.query_range(), 2..4);
         assert_eq!(seed.target_idx(), 0);
         assert_eq!(seed.target_range(), 0..2);

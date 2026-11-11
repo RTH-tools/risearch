@@ -226,7 +226,7 @@ mod tests {
                 table[q[i].as_usize()][q[i + 1].as_usize()][t[i].as_usize()][t[i + 1].as_usize()] =
                     if i == start { 1000 } else { 100 };
             }
-            let seed = SeedHit::new(0, start, 0, start, 2, crate::Strand::Forward);
+            let seed = SeedHit::new(start, 0, start, 2, crate::Strand::Forward);
             for penalty in [49, 50, 51] {
                 let model = ScoringModel::new(&table, Energy(1000), Energy(penalty));
                 let mut engine = ExtensionEngine::new(Some(3), true, &model);
@@ -298,7 +298,7 @@ mod tests {
             assert!(tcols[seed_column..seed_column + 2]
                 .iter()
                 .all(|b| *b != Base::Gap));
-            let seed = SeedHit::new(0, qs, 0, ts, 2, crate::Strand::Forward);
+            let seed = SeedHit::new(qs, 0, ts, 2, crate::Strand::Forward);
             for penalty in [0, 7] {
                 let model = ScoringModel::new(&table, Energy(1000), Energy(penalty));
                 let mut engine = ExtensionEngine::new(Some(20), true, &model);
@@ -447,7 +447,7 @@ mod tests {
         let model = test_model();
         let query = [Base::A, Base::U, Base::G, Base::C];
         let target = [Base::U; 200];
-        let seed = SeedHit::new(0, 1, 0, 1, 2, crate::Strand::Forward);
+        let seed = SeedHit::new(1, 0, 1, 2, crate::Strand::Forward);
 
         let mut unlimited = ExtensionEngine::new(None, true, &model);
         let mut fixed = ExtensionEngine::new(Some(query.len()), true, &model);

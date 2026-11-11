@@ -294,7 +294,7 @@ impl SearchWorker {
 
             if ext.energy <= opts.filter.delta_g {
                 let alignment = self.extension.materialize_alignment(query, target, &seed);
-                hits.push(SearchHit::new(&seed, ext, alignment, tview));
+                hits.push(SearchHit::new(query_idx, &seed, ext, alignment, tview));
             }
         })?;
         // Dedup is exact per query: every box-mate of `query_idx` is in `hits`.
@@ -363,6 +363,7 @@ impl SearchHit {
     /// Convert the extension's duplex-frame target span to FASTA coordinates and
     /// record the hit.
     fn new(
+        query_idx: usize,
         seed: &SeedHit,
         ext: SeedExtension,
         alignment: Option<Box<[AlignColumn]>>,
@@ -378,7 +379,7 @@ impl SearchHit {
         let (t_start, t_end) = inclusive_bounds(fasta_t_range);
 
         Self {
-            query_idx: u32::try_from(seed.query_idx()).expect("query index exceeds u32"),
+            query_idx: u32::try_from(query_idx).expect("query index exceeds u32"),
             target_idx: u32::try_from(seed.target_idx()).expect("target index exceeds u32"),
             q_start,
             q_end,

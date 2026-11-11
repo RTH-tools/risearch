@@ -195,7 +195,6 @@ fn assert_seeds_match_enumeration(
         let mut actual = Vec::new();
         engine
             .seed_query(query_index, config, |s| {
-                assert_eq!(s.query_idx(), query_index);
                 actual.push((
                     s.target_idx(),
                     char::from(s.strand()),
