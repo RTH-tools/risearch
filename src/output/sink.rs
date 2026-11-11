@@ -22,7 +22,7 @@ use crate::seq::Sequence;
 /// after the search returns.
 pub struct TextSink<'a> {
     queries: &'a [(String, Sequence)],
-    store: &'a TargetRegistry,
+    targets: &'a TargetRegistry,
     format: OutputFormat,
     out: OutputWriter,
 }
@@ -30,13 +30,13 @@ pub struct TextSink<'a> {
 impl<'a> TextSink<'a> {
     /// `output_path` is a file, or a directory when `output.multifile` is set.
     ///
-    /// `queries` and `store` must be the ones later passed to
+    /// `queries` and `targets` must be the ones later passed to
     /// [`run_search`](crate::run_search): `consume` indexes them by the driver's
     /// `query_idx`, so a different pair silently attributes rows to the wrong
     /// sequences.
     pub fn new(
         queries: &'a [(String, Sequence)],
-        store: &'a TargetRegistry,
+        targets: &'a TargetRegistry,
         output: &OutputConfig,
         output_path: &Path,
     ) -> Result<Self> {
@@ -55,7 +55,7 @@ impl<'a> TextSink<'a> {
 
         Ok(Self {
             queries,
-            store,
+            targets,
             format: output.format,
             out,
         })
@@ -70,7 +70,7 @@ impl HitSink for TextSink<'_> {
         let q_name = &self.queries[query_idx].0;
 
         // Loop-invariant: rebuilding it per hit re-enters the rkyv root.
-        let tview = self.store.view();
+        let tview = self.targets.view();
 
         // `format_hit_into` reserves per hit, so the buffer sizes itself.
         let mut block = Vec::new();
@@ -78,7 +78,7 @@ impl HitSink for TextSink<'_> {
             let target_idx = hit.target_index();
             let target = tview.target(target_idx, hit.strand);
             let target_range = hit.duplex_target_range(tview);
-            let t_name = self.store.get_name(target_idx);
+            let t_name = self.targets.get_name(target_idx);
             format_hit_into(
                 &mut block,
                 hit,

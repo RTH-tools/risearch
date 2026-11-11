@@ -85,8 +85,8 @@ impl PyTargetRegistry {
     fn open(py: Python<'_>, path: PathBuf) -> Result<Self> {
         // Archive validation is rayon-parallel: a worker that logs deadlocks if
         // this thread holds the GIL.
-        let store = py.detach(|| TargetRegistry::open(&path))?;
-        Ok(PyTargetRegistry(store))
+        let targets = py.detach(|| TargetRegistry::open(&path))?;
+        Ok(PyTargetRegistry(targets))
     }
 
     fn __repr__(&self) -> String {

@@ -169,25 +169,25 @@ fn dedup_hits(hits: Vec<SearchHit>) -> Vec<SearchHit> {
 /// error.
 pub fn run_search(
     queries: &[(String, Sequence)],
-    store: &TargetRegistry,
+    targets: &TargetRegistry,
     opts: &SearchConfig,
     sink: &dyn HitSink,
 ) -> Result<usize> {
     opts.validate()?;
 
     let queries = QueryRegistry::build(queries.to_vec(), &opts.seed)?;
-    // Deliberately not flushed: an empty store leaves the destination
+    // Deliberately not flushed: an empty index leaves the destination
     // untouched, where a zero-hit run truncates it.
-    if store.is_empty() {
+    if targets.is_empty() {
         return Ok(0);
     }
 
     check_unlimited_fits(&queries, opts)?;
-    log_search_banner(&queries, store, opts);
+    log_search_banner(&queries, targets, opts);
 
     let ctx = SearchContext {
         queries: &queries,
-        store,
+        targets,
         opts,
         model: ScoringModel::load(
             &opts.score.dsm_id,
@@ -195,7 +195,7 @@ pub fn run_search(
             opts.score.penalty,
         )?,
     };
-    let engine = SeedingEngine::new(ctx.queries, ctx.store);
+    let engine = SeedingEngine::new(ctx.queries, ctx.targets);
     let counts: Vec<usize> = (0..ctx.queries.len())
         .into_par_iter()
         .map_init(
@@ -217,7 +217,7 @@ pub fn run_search(
 
 struct SearchContext<'a> {
     queries: &'a QueryRegistry,
-    store: &'a TargetRegistry,
+    targets: &'a TargetRegistry,
     opts: &'a SearchConfig,
     model: ScoringModel,
 }
@@ -243,7 +243,7 @@ fn check_unlimited_fits(queries: &QueryRegistry, opts: &SearchConfig) -> Result<
     Ok(())
 }
 
-fn log_search_banner(queries: &QueryRegistry, store: &TargetRegistry, opts: &SearchConfig) {
+fn log_search_banner(queries: &QueryRegistry, targets: &TargetRegistry, opts: &SearchConfig) {
     let max_ext = if opts.extend.is_unlimited() {
         format!("unlimited(<={MAX_EXT})")
     } else {
@@ -252,7 +252,7 @@ fn log_search_banner(queries: &QueryRegistry, store: &TargetRegistry, opts: &Sea
     info!(
         "Starting search: {} queries x {} targets, seed_length={:?}, max_ext={}, delta_g={}",
         queries.len(),
-        store.len(),
+        targets.len(),
         opts.seed.seed_length,
         max_ext,
         opts.filter.delta_g
@@ -285,7 +285,7 @@ impl SearchWorker {
         let query = ctx.queries[query_idx].sequence();
 
         // Loop-invariant: rebuilding it per seed re-enters the rkyv root twice.
-        let tview = ctx.store.view();
+        let tview = ctx.targets.view();
         let mut hits = Vec::new();
         engine.seed_query(query_idx, &opts.seed, |seed| {
             let target = tview.target(seed.target_idx(), seed.strand());

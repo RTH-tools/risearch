@@ -27,15 +27,15 @@ struct HitColumns {
 /// finishes, so the full hit set is never materialized at once.
 pub(crate) struct ArrowSink<'a> {
     queries: &'a [(String, Sequence)],
-    store: &'a TargetRegistry,
+    targets: &'a TargetRegistry,
     columns: Mutex<HitColumns>,
 }
 
 impl<'a> ArrowSink<'a> {
-    pub(crate) fn new(queries: &'a [(String, Sequence)], store: &'a TargetRegistry) -> Self {
+    pub(crate) fn new(queries: &'a [(String, Sequence)], targets: &'a TargetRegistry) -> Self {
         Self {
             queries,
-            store,
+            targets,
             columns: Mutex::new(HitColumns::default()),
         }
     }
@@ -93,7 +93,8 @@ impl HitSink for ArrowSink<'_> {
             c.query_idx.append_value(u64::from(h.query_idx));
             c.query_name.append_value(query_name);
             c.target_idx.append_value(u64::from(h.target_idx));
-            c.target_name.append_value(self.store.get_name(target_idx));
+            c.target_name
+                .append_value(self.targets.get_name(target_idx));
             // The index format is 64-bit only, so usize never exceeds u64.
             c.q_start.append_value(h.q_start as u64);
             c.q_end.append_value(h.q_end as u64);
