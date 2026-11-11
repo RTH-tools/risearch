@@ -20,57 +20,29 @@ impl FromStr for LegacyMismatchSpec {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let s = s.trim();
-        if s.is_empty() {
-            return Err("empty mismatch spec".into());
-        }
-
-        let parts: Vec<&str> = s.split(':').collect();
-        match parts.len() {
-            1 => {
-                let max = parts[0]
-                    .parse::<usize>()
-                    .map_err(|e| format!("invalid max mismatches: {}", e))?;
-                Ok(Self {
-                    max_mismatches: max,
-                    min_prefix_matches: max,
-                    min_suffix_matches: max,
-                })
+        let parts = s
+            .trim()
+            .split(':')
+            .map(|part| {
+                part.parse::<usize>()
+                    .map_err(|e| format!("invalid mismatch spec '{s}': {e}"))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let (max_mismatches, min_prefix_matches, min_suffix_matches) = match parts[..] {
+            [c] => (c, c, c),
+            [c, p] => (c, p, p),
+            [c, ps, pe] => (c, ps, pe),
+            _ => {
+                return Err(format!(
+                    "invalid mismatch spec '{s}': expected 'c', 'c:p', or 'c:ps:pe' format"
+                ))
             }
-            2 => {
-                let max = parts[0]
-                    .parse::<usize>()
-                    .map_err(|e| format!("invalid max mismatches: {}", e))?;
-                let min = parts[1]
-                    .parse::<usize>()
-                    .map_err(|e| format!("invalid min consecutive: {}", e))?;
-                Ok(Self {
-                    max_mismatches: max,
-                    min_prefix_matches: min,
-                    min_suffix_matches: min,
-                })
-            }
-            3 => {
-                let max = parts[0]
-                    .parse::<usize>()
-                    .map_err(|e| format!("invalid max mismatches: {}", e))?;
-                let min_prefix = parts[1]
-                    .parse::<usize>()
-                    .map_err(|e| format!("invalid min prefix matches: {}", e))?;
-                let min_suffix = parts[2]
-                    .parse::<usize>()
-                    .map_err(|e| format!("invalid min suffix matches: {}", e))?;
-                Ok(Self {
-                    max_mismatches: max,
-                    min_prefix_matches: min_prefix,
-                    min_suffix_matches: min_suffix,
-                })
-            }
-            _ => Err(format!(
-                "invalid mismatch spec '{}': expected 'c', 'c:p', or 'c:ps:pe' format",
-                s
-            )),
-        }
+        };
+        Ok(Self {
+            max_mismatches,
+            min_prefix_matches,
+            min_suffix_matches,
+        })
     }
 }
 
@@ -86,66 +58,26 @@ impl FromStr for LegacySeedSpec {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let parse =
+            |val: &str, field: &str| val.parse::<i64>().map_err(|e| format!("bad {field}: {e}"));
+
         let s = s.trim();
-        if s.is_empty() {
-            return Err("empty seed spec".into());
-        }
-
-        let parse_i64 = |val: &str, field: &str| -> Result<i64, String> {
-            val.parse::<i64>()
-                .map_err(|e| format!("bad {}: {}", field, e))
+        let Some((start, rest)) = s.split_once(':') else {
+            return Ok(Self {
+                seed_start: None,
+                seed_end: None,
+                seed_length: Some(parse(s, "length")?),
+            });
         };
-
-        match s.find(':') {
-            None => {
-                let len = parse_i64(s, "length")?;
-                Ok(Self {
-                    seed_start: None,
-                    seed_end: None,
-                    seed_length: Some(len),
-                })
-            }
-            Some(colon_idx) => {
-                let (start_str, rest) = s.split_at(colon_idx);
-                let rest = &rest[1..];
-
-                if rest.is_empty() {
-                    return Err("missing end in interval".into());
-                }
-
-                let start = parse_i64(start_str, "start")?;
-
-                match rest.find('/') {
-                    None => {
-                        let end = parse_i64(rest, "end")?;
-                        Ok(Self {
-                            seed_start: Some(start),
-                            seed_end: Some(end),
-                            seed_length: None,
-                        })
-                    }
-                    Some(slash_idx) => {
-                        let (end_str, len_part) = rest.split_at(slash_idx);
-                        let len_str = &len_part[1..];
-
-                        if end_str.is_empty() {
-                            return Err("missing end in interval".into());
-                        }
-                        if len_str.is_empty() {
-                            return Err("missing length after '/'".into());
-                        }
-
-                        let end = parse_i64(end_str, "end")?;
-                        let length = parse_i64(len_str, "length")?;
-                        Ok(Self {
-                            seed_start: Some(start),
-                            seed_end: Some(end),
-                            seed_length: Some(length),
-                        })
-                    }
-                }
-            }
-        }
+        let (end, length) = match rest.split_once('/') {
+            Some((end, length)) => (end, Some(parse(length, "length")?)),
+            None => (rest, None),
+        };
+        Ok(Self {
+            seed_start: Some(parse(start, "start")?),
+            seed_end: Some(parse(end, "end")?),
+            seed_length: length,
+        })
     }
 }
 
