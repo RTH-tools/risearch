@@ -451,15 +451,17 @@ mod tests {
         assert!(hits.is_empty(), "no duplex reaches -100 kcal/mol");
     }
 
-    #[test]
-    fn run_search_validates_configs_constructed_without_clap() {
-        let bad_penalty = config(|c| c.score.penalty = Energy::from_kcal(-0.1));
-        let err = search(&QUERIES, &TARGETS, &bad_penalty).unwrap_err();
-        assert!(err.to_string().contains("penalty"));
-
-        let bad_window = config(|c| c.extend.max_extension = -2);
-        let err = search(&QUERIES, &TARGETS, &bad_window).unwrap_err();
-        assert!(err.to_string().contains("max extension"));
+    #[rstest]
+    #[case::negative_penalty(|c: &mut SearchConfig| c.score.penalty = Energy::from_kcal(-0.1), "penalty")]
+    #[case::window_below_unlimited(|c: &mut SearchConfig| c.extend.max_extension = -2, "max extension")]
+    #[case::temperature_out_of_range(|c: &mut SearchConfig| c.score.temperature = 51, "temperature")]
+    #[case::half_set_seed_interval(|c: &mut SearchConfig| c.seed.seed_start = Some(2), "together")]
+    fn run_search_validates_configs_constructed_without_clap(
+        #[case] edit: fn(&mut SearchConfig),
+        #[case] message: &str,
+    ) {
+        let err = search(&QUERIES, &TARGETS, &config(edit)).unwrap_err();
+        assert!(err.to_string().contains(message), "{err}");
     }
 
     /// Zero-hit behaviour differs by topology and neither branch is covered by a
