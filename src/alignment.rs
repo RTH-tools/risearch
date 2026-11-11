@@ -129,31 +129,6 @@ impl AlignColumn {
             target,
         }
     }
-
-    /// Record a paired column classified by another aligner.
-    ///
-    /// The reported chemistry is comparison data, so it is not re-derived from
-    /// the bases. Consumption remains valid because both inputs are required.
-    #[doc(hidden)]
-    #[inline]
-    pub const fn reported_pair(class: PairClass, query: Base, target: Base) -> Self {
-        assert!(
-            matches!(
-                class,
-                PairClass::Canonical | PairClass::Wobble | PairClass::Mismatch
-            ),
-            "a reported pair must consume both inputs"
-        );
-        assert!(
-            !matches!(query, Base::Gap) && !matches!(target, Base::Gap),
-            "a reported pair must consume two non-gap inputs"
-        );
-        Self {
-            class,
-            query,
-            target,
-        }
-    }
 }
 
 /// The canonical fingerprint spelling and traversal order for an alignment.
