@@ -5,7 +5,7 @@
 //! work with Base enums throughout the codebase.
 
 use crate::types::Base;
-use std::ops::{Deref, Index, Range, RangeFrom, RangeFull, RangeTo};
+use std::ops::Deref;
 
 /// A normalized RNA sequence stored as Vec<Base>.
 ///
@@ -14,84 +14,12 @@ use std::ops::{Deref, Index, Range, RangeFrom, RangeFull, RangeTo};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Sequence(Vec<Base>);
 
-impl Sequence {
-    /// Length of the sequence
-    #[inline]
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    /// Check if sequence is empty
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
-    }
-
-    /// Iterator over bases
-    pub fn iter(&self) -> impl Iterator<Item = &Base> {
-        self.0.iter()
-    }
-
-    /// Unchecked access to base at index (for DP hot path).
-    ///
-    /// # Safety
-    /// Caller must ensure `index < self.len()`.
-    /// Use only in performance-critical code where bounds are pre-validated.
-    #[inline(always)]
-    pub unsafe fn get_unchecked(&self, index: usize) -> Base {
-        // SAFETY: Caller guarantees index is in bounds
-        unsafe { *self.0.get_unchecked(index) }
-    }
-}
-
 // Implement Deref to allow treating Sequence as &[Base]
 impl Deref for Sequence {
     type Target = [Base];
 
     fn deref(&self) -> &[Base] {
         &self.0
-    }
-}
-
-// Implement Index to allow seq[i] access
-impl Index<usize> for Sequence {
-    type Output = Base;
-
-    fn index(&self, index: usize) -> &Base {
-        &self.0[index]
-    }
-}
-
-// Implement Index for ranges
-impl Index<Range<usize>> for Sequence {
-    type Output = [Base];
-
-    fn index(&self, index: Range<usize>) -> &[Base] {
-        &self.0[index]
-    }
-}
-
-impl Index<RangeFrom<usize>> for Sequence {
-    type Output = [Base];
-
-    fn index(&self, index: RangeFrom<usize>) -> &[Base] {
-        &self.0[index]
-    }
-}
-
-impl Index<RangeTo<usize>> for Sequence {
-    type Output = [Base];
-
-    fn index(&self, index: RangeTo<usize>) -> &[Base] {
-        &self.0[index]
-    }
-}
-
-impl Index<RangeFull> for Sequence {
-    type Output = [Base];
-
-    fn index(&self, index: RangeFull) -> &[Base] {
-        &self.0[index]
     }
 }
 
@@ -170,30 +98,5 @@ mod tests {
 
         assert_eq!(slice.len(), 4);
         assert_eq!(slice[0], Base::A);
-    }
-
-    #[test]
-    fn indexing_returns_the_underlying_bases() {
-        let seq = Sequence::try_from(b"ACGU".as_slice()).unwrap();
-
-        assert_eq!(seq.len(), 4);
-        assert!(!seq.is_empty());
-        assert!(Sequence::from(Vec::new()).is_empty());
-        assert_eq!(seq[0], Base::A);
-        assert_eq!(seq[1], Base::C);
-        assert_eq!(seq[2], Base::G);
-        assert_eq!(seq[3], Base::U);
-        assert_eq!(&seq[1..3], &[Base::C, Base::G]);
-        assert_eq!(&seq[2..], &[Base::G, Base::U]);
-        assert_eq!(&seq[..2], &[Base::A, Base::C]);
-        assert_eq!(&seq[..], &[Base::A, Base::C, Base::G, Base::U]);
-    }
-
-    #[test]
-    fn iter_yields_all_bases() {
-        let seq = Sequence::try_from(b"ACG".as_slice()).unwrap();
-        let bases: Vec<Base> = seq.iter().copied().collect();
-
-        assert_eq!(bases, vec![Base::A, Base::C, Base::G]);
     }
 }
