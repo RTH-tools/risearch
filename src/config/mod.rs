@@ -133,7 +133,7 @@ impl Default for SeedConfig {
             no_max_prune: false,
             max_mismatches: 0,
             min_prefix_matches: 1,
-            min_suffix_matches: 0,
+            min_suffix_matches: 1,
         }
     }
 }

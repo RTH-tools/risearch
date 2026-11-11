@@ -58,7 +58,7 @@ def search(
     energy_threshold: float = -20.0,
     mismatches: int = 0,
     mismatch_prefix: int = 1,
-    mismatch_suffix: int = 0,
+    mismatch_suffix: int = 1,
     seed_wobble: bool = False,
     matrix: str | PathLike[str] = "t04",
     penalty: float = 0.0,

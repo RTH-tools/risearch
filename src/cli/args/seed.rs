@@ -63,8 +63,7 @@ pub(crate) struct SeedArgs {
     /// Mismatches allowed in a seed
     ///
     /// A seed with mismatches is dropped when it contains an uninterrupted run of the minimum seed
-    /// length, since perfect seeds already cover that region. Also sets the defaults of
-    /// --mismatch-prefix and --mismatch-suffix.
+    /// length, since perfect seeds already cover that region.
     #[arg(
         long = "mismatch-max",
         value_name = "COUNT",
@@ -72,38 +71,28 @@ pub(crate) struct SeedArgs {
     )]
     pub(crate) mismatch_max: usize,
 
-    /// Matches required at the seed start (5') before any mismatch [default: same as --mismatch-max]
+    /// Matches required at the seed start (5') before any mismatch
     #[arg(
         long = "mismatch-prefix",
         value_name = "LENGTH",
         requires = "mismatch_max",
+        default_value_t = SeedConfig::default().min_prefix_matches,
         hide_short_help = true
     )]
-    pub(crate) mismatch_prefix: Option<usize>,
+    pub(crate) mismatch_prefix: usize,
 
-    /// Matches required at the seed end (3') after any mismatch [default: same as --mismatch-prefix]
+    /// Matches required at the seed end (3') after any mismatch
     #[arg(
         long = "mismatch-suffix",
         value_name = "LENGTH",
-        requires_all = ["mismatch_max", "mismatch_prefix"],
+        requires = "mismatch_max",
+        default_value_t = SeedConfig::default().min_suffix_matches,
         hide_short_help = true
     )]
-    pub(crate) mismatch_suffix: Option<usize>,
+    pub(crate) mismatch_suffix: usize,
 }
 
 impl SeedArgs {
-    fn resolve_mismatches(&self) -> Result<(usize, usize, usize), String> {
-        match (self.mismatch_max, self.mismatch_prefix, self.mismatch_suffix) {
-            (max, None, None) => Ok((max, max, max)),
-            (max, Some(prefix), None) => Ok((max, prefix, prefix)),
-            (max, Some(prefix), Some(suffix)) => Ok((max, prefix, suffix)),
-            _ => Err(
-                "use mismatch-max alone, or mismatch-max + mismatch-prefix (optionally with mismatch-suffix)"
-                    .into(),
-            ),
-        }
-    }
-
     fn resolve_seed_bounds(&self) -> Result<SeedBounds, String> {
         match (self.seed_start, self.seed_end, self.seed_length) {
             (Some(s), Some(e), length) => Ok((Some(s), Some(e), length)),
@@ -122,8 +111,6 @@ impl TryFrom<SeedArgs> for SeedConfig {
     fn try_from(value: SeedArgs) -> Result<Self, Self::Error> {
         let (seed_start, seed_end, seed_length) =
             value.resolve_seed_bounds().map_err(Error::msg)?;
-        let (max_mismatches, min_prefix_matches, min_suffix_matches) =
-            value.resolve_mismatches().map_err(Error::msg)?;
 
         let config = SeedConfig {
             seed_start,
@@ -131,9 +118,9 @@ impl TryFrom<SeedArgs> for SeedConfig {
             seed_length,
             seed_wobble: value.seed_wobble,
             no_max_prune: value.no_max_prune,
-            max_mismatches,
-            min_prefix_matches,
-            min_suffix_matches,
+            max_mismatches: value.mismatch_max,
+            min_prefix_matches: value.mismatch_prefix,
+            min_suffix_matches: value.mismatch_suffix,
         };
         config.validate().map_err(Error::msg)?;
         Ok(config)
@@ -144,24 +131,6 @@ impl TryFrom<SeedArgs> for SeedConfig {
 mod tests {
     use super::{SeedArgs, SeedBounds};
     use risearch::config::SeedConfig;
-
-    fn test_args_mismatch(
-        max: usize,
-        prefix: Option<usize>,
-        suffix: Option<usize>,
-    ) -> Result<(usize, usize, usize), String> {
-        let args = SeedArgs {
-            seed_start: None,
-            seed_end: None,
-            seed_length: None,
-            seed_wobble: false,
-            no_max_prune: false,
-            mismatch_max: max,
-            mismatch_prefix: prefix,
-            mismatch_suffix: suffix,
-        };
-        args.resolve_mismatches()
-    }
 
     fn test_args_seed(
         start: Option<i64>,
@@ -175,30 +144,10 @@ mod tests {
             seed_wobble: false,
             no_max_prune: false,
             mismatch_max: 0,
-            mismatch_prefix: None,
-            mismatch_suffix: None,
+            mismatch_prefix: 1,
+            mismatch_suffix: 1,
         };
         args.resolve_seed_bounds()
-    }
-
-    #[test]
-    fn builds_mismatch_from_named_args() {
-        assert_eq!(test_args_mismatch(0, None, None).expect("parse"), (0, 0, 0));
-        assert_eq!(test_args_mismatch(1, None, None).expect("parse"), (1, 1, 1));
-        assert_eq!(
-            test_args_mismatch(1, Some(3), None).expect("parse"),
-            (1, 3, 3)
-        );
-        assert_eq!(
-            test_args_mismatch(1, Some(3), Some(5)).expect("parse"),
-            (1, 3, 5)
-        );
-    }
-
-    #[test]
-    fn rejects_partial_named_mismatch_args() {
-        assert!(test_args_mismatch(0, None, Some(5)).is_err());
-        assert!(test_args_mismatch(1, None, Some(5)).is_err());
     }
 
     #[test]
@@ -236,8 +185,8 @@ mod tests {
             seed_wobble: false,
             no_max_prune: false,
             mismatch_max: 0,
-            mismatch_prefix: None,
-            mismatch_suffix: None,
+            mismatch_prefix: 1,
+            mismatch_suffix: 1,
         };
 
         assert!(SeedConfig::try_from(args).is_err());

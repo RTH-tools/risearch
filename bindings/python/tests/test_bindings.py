@@ -501,6 +501,8 @@ def test_documented_defaults_are_pinned():
     assert public["max_extension"].default == 20
     assert public["temperature"].default is None
     assert public["matrix"].default == "t04"
+    assert public["mismatch_prefix"].default == 1
+    assert public["mismatch_suffix"].default == 1
 
 
 def test_native_search_is_callable_with_every_kwarg(store):

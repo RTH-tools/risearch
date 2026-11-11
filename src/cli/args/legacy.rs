@@ -271,8 +271,8 @@ impl SearchArgs {
                 m.max_mismatches, m.min_prefix_matches, m.min_suffix_matches
             );
             self.seed.mismatch_max = m.max_mismatches;
-            self.seed.mismatch_prefix = Some(m.min_prefix_matches);
-            self.seed.mismatch_suffix = Some(m.min_suffix_matches);
+            self.seed.mismatch_prefix = m.min_prefix_matches;
+            self.seed.mismatch_suffix = m.min_suffix_matches;
         }
 
         if let Some(id) = legacy.matrix_legacy {

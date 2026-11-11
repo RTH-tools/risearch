@@ -22,10 +22,7 @@ fn fixture(name: &str) -> PathBuf {
 fn config() -> SearchConfig {
     let mut config = SearchConfig::default();
     config.seed.seed_length = Some(6);
-    // `--mismatch-max` alone expands to prefix = suffix = max on the CLI side.
     config.seed.max_mismatches = 2;
-    config.seed.min_prefix_matches = 2;
-    config.seed.min_suffix_matches = 2;
     config.extend.max_extension = 30;
     config.extend.build_alignment = false;
     config.filter.delta_g = Energy::from_kcal(-5.0);

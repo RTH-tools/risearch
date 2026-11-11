@@ -15,7 +15,7 @@ mod tests {
         assert!(!cfg.seed.seed_wobble);
         assert_eq!(cfg.seed.max_mismatches, 0);
         assert_eq!(cfg.seed.min_prefix_matches, 1);
-        assert_eq!(cfg.seed.min_suffix_matches, 0);
+        assert_eq!(cfg.seed.min_suffix_matches, 1);
         assert_eq!(cfg.score.dsm_id, DsmId::from("t04"));
         assert_eq!(cfg.score.penalty, Energy::default());
         assert_eq!(cfg.score.temperature, 37);
