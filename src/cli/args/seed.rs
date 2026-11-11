@@ -1,9 +1,6 @@
 use anyhow::Error;
 use risearch::config::{SeedConfig, DEFAULT_SEED_LEN};
 
-/// Resolved (seed_start, seed_end, seed_length) bounds from CLI parsing.
-type SeedBounds = (Option<i64>, Option<i64>, Option<i64>);
-
 /// Arguments for seed generation
 #[derive(clap::Args, Debug, Clone)]
 pub(crate) struct SeedArgs {
@@ -92,30 +89,14 @@ pub(crate) struct SeedArgs {
     pub(crate) mismatch_suffix: usize,
 }
 
-impl SeedArgs {
-    fn resolve_seed_bounds(&self) -> Result<SeedBounds, String> {
-        match (self.seed_start, self.seed_end, self.seed_length) {
-            (Some(s), Some(e), length) => Ok((Some(s), Some(e), length)),
-            (None, None, length) => Ok((None, None, length)),
-            _ => Err(
-                "use seed_length alone, or seed_start + seed_end (optionally with seed_length)"
-                    .into(),
-            ),
-        }
-    }
-}
-
 impl TryFrom<SeedArgs> for SeedConfig {
     type Error = Error;
 
     fn try_from(value: SeedArgs) -> Result<Self, Self::Error> {
-        let (seed_start, seed_end, seed_length) =
-            value.resolve_seed_bounds().map_err(Error::msg)?;
-
         let config = SeedConfig {
-            seed_start,
-            seed_end,
-            seed_length,
+            seed_start: value.seed_start,
+            seed_end: value.seed_end,
+            seed_length: value.seed_length,
             seed_wobble: value.seed_wobble,
             no_max_prune: value.no_max_prune,
             max_mismatches: value.mismatch_max,
@@ -129,52 +110,8 @@ impl TryFrom<SeedArgs> for SeedConfig {
 
 #[cfg(test)]
 mod tests {
-    use super::{SeedArgs, SeedBounds};
+    use super::SeedArgs;
     use risearch::config::SeedConfig;
-
-    fn test_args_seed(
-        start: Option<i64>,
-        end: Option<i64>,
-        length: Option<i64>,
-    ) -> Result<SeedBounds, String> {
-        let args = SeedArgs {
-            seed_start: start,
-            seed_end: end,
-            seed_length: length,
-            seed_wobble: false,
-            no_max_prune: false,
-            mismatch_max: 0,
-            mismatch_prefix: 1,
-            mismatch_suffix: 1,
-        };
-        args.resolve_seed_bounds()
-    }
-
-    #[test]
-    fn builds_seed_from_named_args() {
-        assert_eq!(
-            test_args_seed(None, None, None).expect("parse"),
-            (None, None, None)
-        );
-        assert_eq!(
-            test_args_seed(None, None, Some(6)).expect("parse"),
-            (None, None, Some(6))
-        );
-        assert_eq!(
-            test_args_seed(Some(3), Some(12), None).expect("parse"),
-            (Some(3), Some(12), None)
-        );
-        assert_eq!(
-            test_args_seed(Some(3), Some(12), Some(7)).expect("parse"),
-            (Some(3), Some(12), Some(7))
-        );
-    }
-
-    #[test]
-    fn rejects_partial_named_seed_args() {
-        assert!(test_args_seed(Some(3), None, None).is_err());
-        assert!(test_args_seed(None, Some(12), None).is_err());
-    }
 
     #[test]
     fn seed_args_conversion_is_fallible_for_invalid_partial_seed_bounds() {
