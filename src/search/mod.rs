@@ -32,7 +32,7 @@ use crate::index::view::TargetView;
 use crate::registry::QueryRegistry;
 use crate::seed::{SeedHit, SeedingEngine};
 use crate::seq::Sequence;
-use crate::types::{Base, Energy, Strand};
+use crate::types::{Energy, Strand};
 
 /// One accepted interaction: a span of a query paired against a span of a target.
 ///
@@ -42,9 +42,7 @@ use crate::types::{Base, Energy, Strand};
 /// that span is converted to FASTA coordinates once when the hit is assembled.
 ///
 /// Bases and names are not carried, only indices into the queries passed to
-/// [`run_search`] and into the target registry. [`query`](Self::query) slices a
-/// supplied query sequence; [`target`](Self::target) resolves the paired span
-/// through a [`TargetView`].
+/// [`run_search`] and into the target registry.
 ///
 /// `alignment` is populated only under
 /// [`ExtendConfig::build_alignment`](crate::ExtendConfig).
@@ -334,17 +332,6 @@ impl SearchHit {
         })
     }
 
-    /// Slice the paired span out of a query sequence.
-    pub fn query<'a>(&self, q_seq: &'a [Base]) -> &'a [Base] {
-        &q_seq[self.q_start..=self.q_end]
-    }
-
-    /// Resolve the paired span against the strand-selected target, in duplex-column order.
-    pub fn target<'a>(&self, targets: TargetView<'a>) -> &'a [Base] {
-        let target = targets.target(self.target_index(), self.strand);
-        &target[self.duplex_target_range(targets)]
-    }
-
     /// Map the public inclusive FASTA coordinates into a half-open range over
     /// the strand-selected duplex target.
     pub(crate) fn duplex_target_range(&self, targets: TargetView<'_>) -> Range<usize> {
@@ -401,7 +388,7 @@ mod tests {
     };
     use super::*;
     use crate::index::store::TargetRegistry;
-    use crate::types::DsmId;
+    use crate::types::{Base, DsmId};
     use rstest::rstest;
 
     #[test]
