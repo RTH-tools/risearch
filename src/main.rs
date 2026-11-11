@@ -2,10 +2,12 @@
 
 mod cli;
 
+use clap::Parser;
+
 #[cfg(feature = "mimalloc")]
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 fn main() -> anyhow::Result<()> {
-    cli::main()
+    cli::app::run(cli::Cli::parse())
 }

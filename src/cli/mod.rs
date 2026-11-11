@@ -8,10 +8,6 @@ use std::path::PathBuf;
 
 pub(crate) use args::SearchArgs;
 
-pub(crate) fn main() -> anyhow::Result<()> {
-    app::run(Cli::parse())
-}
-
 const STYLES: Styles = Styles::styled()
     .header(AnsiColor::Green.on_default().bold())
     .usage(AnsiColor::Green.on_default().bold())

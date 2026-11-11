@@ -15,15 +15,11 @@ use risearch::{output, search, Sequence, TargetRegistry};
 use crate::cli::{Cli, Commands, SearchArgs};
 
 pub(crate) fn run(cli: Cli) -> Result<()> {
-    match &cli.command {
-        Commands::Index(cmd) => {
-            init_runtime(cli.verbose, cli.jobs)?;
-            cmd_index(&cmd.input, &cmd.output, cli.jobs)
-        }
-        Commands::Search(cmd) => {
-            init_runtime(cli.verbose, cli.jobs)?;
-            cmd_search(cmd)
-        }
+    init_logging(cli.verbose);
+    init_thread_pool(cli.jobs)?;
+    match cli.command {
+        Commands::Index(cmd) => cmd_index(&cmd.input, &cmd.output, cli.jobs),
+        Commands::Search(cmd) => cmd_search(cmd),
     }
 }
 
@@ -36,8 +32,8 @@ fn cmd_index(input: &Path, output: &Path, threads: Option<NonZeroUsize>) -> Resu
     Ok(())
 }
 
-fn cmd_search(cmd: &SearchArgs) -> Result<()> {
-    let cmd = cmd.clone().resolve_legacy();
+fn cmd_search(cmd: SearchArgs) -> Result<()> {
+    let cmd = cmd.resolve_legacy();
     let query_path = &cmd.input.query;
     let target_path = cmd.input.target.as_deref().expect("clap requires a target");
     let output_path = &cmd.output.path;
@@ -67,11 +63,6 @@ fn read_input(path: &Path) -> Result<Vec<(String, Sequence)>> {
         read_sequences(path)?
     };
     Ok(records)
-}
-
-fn init_runtime(verbosity: u8, threads: Option<NonZeroUsize>) -> Result<()> {
-    init_logging(verbosity);
-    init_thread_pool(threads)
 }
 
 fn init_thread_pool(threads: Option<NonZeroUsize>) -> Result<()> {
