@@ -230,7 +230,7 @@ fn check_unlimited_fits(queries: &QueryRegistry, opts: &SearchConfig) -> Result<
     if !opts.extend.is_unlimited() {
         return Ok(());
     }
-    for (_, q) in queries.iter() {
+    for q in queries.iter() {
         let n = q.sequence().len();
         if n > MAX_EXT {
             return Err(Error::Config(format!(

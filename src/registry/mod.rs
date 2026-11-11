@@ -7,7 +7,7 @@
 use crate::error::{Error, Result};
 use rayon::prelude::*;
 use std::collections::HashSet;
-use std::ops::{Index, Range};
+use std::ops::{Deref, Range};
 
 use crate::config::SeedConfig;
 use crate::seq::Sequence;
@@ -70,28 +70,11 @@ pub struct QueryRegistry {
     inner: Vec<Query>,
 }
 
-impl QueryRegistry {
-    /// Number of loaded queries.
-    pub fn len(&self) -> usize {
-        self.inner.len()
-    }
+impl Deref for QueryRegistry {
+    type Target = [Query];
 
-    /// Whether no queries were loaded.
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    /// Iterate `(index, query)` pairs in load order.
-    pub fn iter(&self) -> impl Iterator<Item = (usize, &Query)> {
-        self.inner.iter().enumerate()
-    }
-}
-
-impl Index<usize> for QueryRegistry {
-    type Output = Query;
-
-    fn index(&self, idx: usize) -> &Self::Output {
-        &self.inner[idx]
+    fn deref(&self) -> &[Query] {
+        &self.inner
     }
 }
 
