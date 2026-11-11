@@ -62,8 +62,10 @@ impl<'a> SeedingEngine<'a> {
         on_seed: &mut F,
     ) -> Result<()> {
         let tview = self.tview;
+        let query_bases = query.sequence();
+        let seed_interval = query.seed_interval();
 
-        let seed = query.seed_sequence();
+        let seed = &query_bases[seed_interval.clone()];
         let prepared_query =
             SuffixIndex::build_for_seed(seed, query.min_seed_len).map_err(|err| {
                 Error::Index(format!(
@@ -72,14 +74,12 @@ impl<'a> SeedingEngine<'a> {
                 ))
             })?;
         let query_suffixes = prepared_query.view();
-        let query_bases = query.sequence();
-        let seed_interval = query.seed_interval();
 
         traverse::<WOBBLE, _>(
             query_suffixes,
             tview.suffixes(),
             query.min_seed_len,
-            query.max_seed_len,
+            seed.len(),
             config.max_mismatches,
             config.min_prefix_matches,
             config.min_suffix_matches,

@@ -19,14 +19,10 @@ pub struct Query {
     name: String,
     /// Full forward sequence used for extension and output
     sequence: Sequence,
-    /// Seed-interval slice; the per-query seeding suffix array is built from this
-    seed_sequence: Sequence,
     /// Pre-computed normalized seed interval bounds on the full query
     pub(crate) seed_interval: Range<usize>,
     /// Minimum admissible seed length for this query after normalization.
     pub(crate) min_seed_len: usize,
-    /// Maximum admissible seed length for this query after normalization.
-    pub(crate) max_seed_len: usize,
 }
 
 impl Query {
@@ -38,17 +34,12 @@ impl Query {
             .resolve(q_len)
             .map_err(|err| Error::Config(format!("Invalid seed spec for query '{id}': {err}")))?;
         let seed_interval = (start1 - 1)..end1;
-        let max_seed_len = seed_interval.end.saturating_sub(seed_interval.start);
-        let seed_sequence =
-            Sequence::from(sequence[seed_interval.start..seed_interval.end].to_vec());
 
         Ok(Self {
             name: id,
             sequence,
-            seed_sequence,
             seed_interval,
             min_seed_len,
-            max_seed_len,
         })
     }
 
@@ -68,12 +59,6 @@ impl Query {
     /// Normalized seed-interval bounds on the full sequence.
     pub fn seed_interval(&self) -> Range<usize> {
         self.seed_interval.clone()
-    }
-
-    #[inline(always)]
-    /// The seed interval as its own slice; the per-query seeding SA is built from this.
-    pub fn seed_sequence(&self) -> &[Base] {
-        &self.seed_sequence
     }
 }
 
@@ -181,26 +166,21 @@ mod tests {
     }
 
     #[test]
-    fn seed_sequence_matches_interval_slice() {
+    fn explicit_interval_resolves_to_half_open_bounds() {
         let sequence = Sequence::from(vec![Base::A, Base::U, Base::G, Base::C, Base::A, Base::U]);
         let query = make_query_data(sequence, Some(2), Some(5), Some(2));
 
         assert_eq!(query.seed_interval, 1..5);
         assert_eq!(query.min_seed_len, 2);
-        assert_eq!(query.max_seed_len, 4);
-        assert_eq!(query.seed_sequence(), &query.sequence()[1..5]);
     }
 
     #[test]
-    fn seed_sequence_tracks_only_valid_interval_starts() {
+    fn default_interval_spans_the_whole_query() {
         let sequence = Sequence::from(vec![Base::A, Base::G, Base::C, Base::U, Base::A]);
         let query = make_query_data(sequence, None, None, Some(3));
 
         assert_eq!(query.seed_interval, 0..5);
         assert_eq!(query.min_seed_len, 3);
-        assert_eq!(query.max_seed_len, 5);
-        assert_eq!(query.seed_sequence().len(), 5);
-        assert_eq!(query.seed_sequence(), query.sequence());
     }
 
     fn seed_config() -> SeedConfig {
