@@ -63,6 +63,23 @@ pub(super) fn collision_config() -> SearchConfig {
     })
 }
 
+/// Mirrors the search settings of `tests/cli_library_agreement.rs`.
+pub(super) fn agreement_config() -> SearchConfig {
+    config(|c| {
+        c.seed.seed_length = Some(6);
+        c.seed.max_mismatches = 2;
+        c.seed.min_prefix_matches = 2;
+        c.seed.min_suffix_matches = 2;
+        c.extend.max_extension = 30;
+        c.filter.delta_g = Energy::from_kcal(-5.0);
+    })
+}
+
+/// The defaults with deduplication off.
+pub(super) fn no_dedup_config() -> SearchConfig {
+    config(|c| c.filter.no_dedup = true)
+}
+
 /// Run the production search and collect its hits.
 pub(super) fn search(
     queries: &[(String, Sequence)],

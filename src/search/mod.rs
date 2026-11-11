@@ -396,7 +396,9 @@ impl SearchHit {
 
 #[cfg(test)]
 mod tests {
-    use super::test_support::{collision_config, config, records, search, QUERIES, TARGETS};
+    use super::test_support::{
+        agreement_config, collision_config, config, records, search, QUERIES, TARGETS,
+    };
     use super::*;
     use crate::index::store::TargetRegistry;
     use crate::types::DsmId;
@@ -490,10 +492,13 @@ mod tests {
     /// Default dedup keeps exactly one hit per bounding box, and that hit carries
     /// the minimum energy among the box's collapsed candidates. `--no-dedup`
     /// reproduces the full per-seed hit set.
-    #[test]
-    fn dedup_keeps_one_min_energy_hit_per_box() {
+    #[rstest]
+    fn dedup_keeps_one_min_energy_hit_per_box(
+        #[values(SearchConfig::default, agreement_config, collision_config)]
+        preset: fn() -> SearchConfig,
+    ) {
         use std::collections::HashMap;
-        let config = collision_config();
+        let config = preset();
         let mut nodedup = config.clone();
         nodedup.filter.no_dedup = true;
 
@@ -522,9 +527,12 @@ mod tests {
     /// so a tie-break that depended on hash/iteration order would surface here as
     /// run-to-run drift (two HashMaps use different random seeds). This covers
     /// behavior raw-hit comparisons cannot exercise because they bypass deduplication.
-    #[test]
-    fn dedup_result_is_deterministic() {
-        let config = collision_config();
+    #[rstest]
+    fn dedup_result_is_deterministic(
+        #[values(SearchConfig::default, agreement_config, collision_config)]
+        preset: fn() -> SearchConfig,
+    ) {
+        let config = preset();
         let boxes = || {
             let hits = search(&QUERIES, &TARGETS, &config).unwrap();
             let mut boxes: Vec<_> = hits.iter().map(|hit| (hit_box(hit), hit.energy)).collect();

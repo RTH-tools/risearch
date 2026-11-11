@@ -9,25 +9,14 @@
 //! a query lands in several records at different global offsets, and the same
 //! local sequence recurs across records.  Toy records cannot pose that question.
 
-use super::test_support::{config, search, QUERIES, TARGETS, TARGET_RECORDS};
+use super::test_support::{
+    agreement_config, collision_config, no_dedup_config, search, QUERIES, TARGETS, TARGET_RECORDS,
+};
 use super::SearchHit;
-use crate::{Energy, SearchConfig, Sequence, TargetRegistry};
+use crate::{SearchConfig, Sequence, TargetRegistry};
+use rstest::rstest;
 use std::collections::HashSet;
 use std::num::NonZeroUsize;
-
-/// Mirrors the search settings of `tests/cli_library_agreement.rs`. Alignment
-/// columns, on by default, let the hit key separate duplexes sharing a
-/// bounding box and an energy.
-fn agreement_config() -> SearchConfig {
-    config(|c| {
-        c.seed.seed_length = Some(6);
-        c.seed.max_mismatches = 2;
-        c.seed.min_prefix_matches = 2;
-        c.seed.min_suffix_matches = 2;
-        c.extend.max_extension = 30;
-        c.filter.delta_g = Energy::from_kcal(-5.0);
-    })
-}
 
 fn alignment_key(hit: &SearchHit) -> Option<String> {
     hit.alignment.as_ref().map(|columns| {
@@ -78,9 +67,18 @@ fn hit_keys(
 /// read through a per-record offset.  Regrouping the records moves every offset
 /// and renumbers every target index; the named hits must not move with them.
 /// 19 is prime, so each group size also leaves a ragged final group.
-#[rstest::rstest]
-fn record_grouping_preserves_named_hits(#[values(1, 4, 7)] group_size: usize) {
-    let config = agreement_config();
+#[rstest]
+fn record_grouping_preserves_named_hits(
+    #[values(
+        SearchConfig::default,
+        agreement_config,
+        collision_config,
+        no_dedup_config
+    )]
+    preset: fn() -> SearchConfig,
+    #[values(1, 4, 7)] group_size: usize,
+) {
+    let config = preset();
     let combined = TargetRegistry::build(TARGET_RECORDS.clone(), Some(NonZeroUsize::MIN)).unwrap();
 
     let hits = search(&QUERIES, &combined, &config).unwrap();
@@ -107,9 +105,17 @@ fn record_grouping_preserves_named_hits(#[values(1, 4, 7)] group_size: usize) {
 
 /// Queries are seeded, extended and deduplicated one at a time on a rayon
 /// worker, so splitting the query file must not change any query's own hits.
-#[test]
-fn query_partitioning_preserves_named_hits() {
-    let config = agreement_config();
+#[rstest]
+fn query_partitioning_preserves_named_hits(
+    #[values(
+        SearchConfig::default,
+        agreement_config,
+        collision_config,
+        no_dedup_config
+    )]
+    preset: fn() -> SearchConfig,
+) {
+    let config = preset();
     let combined_keys = hit_keys(
         search(&QUERIES, &TARGETS, &config).unwrap(),
         &QUERIES,
@@ -137,9 +143,18 @@ fn query_partitioning_preserves_named_hits() {
 /// exactly the hits above the new bound and nothing else.  The cutoff is an
 /// energy the loose run actually reported, at three points of its distribution,
 /// so no quantization stands between the two runs.
-#[rstest::rstest]
-fn stricter_cutoff_returns_exactly_the_eligible_hits(#[values(0.1, 0.5, 0.9)] quantile: f64) {
-    let config = agreement_config();
+#[rstest]
+fn stricter_cutoff_returns_exactly_the_eligible_hits(
+    #[values(
+        SearchConfig::default,
+        agreement_config,
+        collision_config,
+        no_dedup_config
+    )]
+    preset: fn() -> SearchConfig,
+    #[values(0.1, 0.5, 0.9)] quantile: f64,
+) {
+    let config = preset();
 
     let loose_hits = search(&QUERIES, &TARGETS, &config).unwrap();
     let mut energies: Vec<_> = loose_hits.iter().map(|hit| hit.energy).collect();
