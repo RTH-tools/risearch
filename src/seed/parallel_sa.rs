@@ -135,13 +135,6 @@ impl<F: FnMut(SeedMatch)> ParallelSaTraverser<'_, F> {
     }
 
     #[inline(always)]
-    fn can_reach_suffix(&self, depth: usize, match_streak: usize, mm_count: usize) -> bool {
-        mm_count == 0
-            || self.min_suffix == 0
-            || match_streak + (self.max_len - depth) >= self.min_suffix
-    }
-
-    #[inline(always)]
     fn can_mismatch_next(&self, depth: usize, match_streak: usize, mm_count: usize) -> bool {
         let next_depth = depth + 1;
         self.max_mm > 0
@@ -168,10 +161,6 @@ impl<F: FnMut(SeedMatch)> ParallelSaTraverser<'_, F> {
         }
 
         if depth >= self.max_len {
-            return;
-        }
-
-        if !self.can_reach_suffix(depth, match_streak, mm_count) {
             return;
         }
 
@@ -305,10 +294,6 @@ impl<F: FnMut(SeedMatch)> ParallelSaTraverser<'_, F> {
                 return;
             }
 
-            if !self.can_reach_suffix(depth, match_streak, mm_count) {
-                return;
-            }
-
             let d1 = depth + 1;
             let can_mm = self.can_mismatch_next(depth, match_streak, mm_count);
 
@@ -366,10 +351,6 @@ mod tests {
             min_suffix: 3,
             on_match: &mut sink,
         };
-
-        // No depth left to reach min_suffix once a mismatch has been spent.
-        assert!(!traverser.can_reach_suffix(8, 0, 1));
-        assert!(traverser.can_reach_suffix(8, 0, 0));
 
         assert!(traverser.can_mismatch_next(2, 0, 0));
         // max_len - next_depth = 1, short of min_suffix.
@@ -498,73 +479,5 @@ mod tests {
         let q_range = 0..ctx.query.len();
         let t_range = 0..ctx.target.len();
         ctx.recurse::<false>(&q_range, &t_range, 0, 0, 0);
-    }
-
-    #[test]
-    fn pruning_never_discards_an_emittable_descendant() {
-        // Sound over-approximation of "descendant reachable from node": any
-        // (d2, s2, m2) excluded here is a state the assertion never checks.
-        fn descendant_is_reachable(
-            node: (usize, usize, usize),
-            descendant: (usize, usize, usize),
-        ) -> bool {
-            let (depth, streak, mm) = node;
-            let (d2, s2, m2) = descendant;
-            d2 >= depth && m2 >= mm && s2 <= streak + (d2 - depth)
-        }
-
-        let seq = Sequence::from(vec![Base::A, Base::C]);
-        let prepared = SuffixIndex::build_for_seed(&seq, 1).unwrap();
-        let view = prepared.view();
-        let mut sink = |_m: SeedMatch| {};
-
-        const MAX_MM: usize = 2;
-
-        for min_len in 1..=5 {
-            for max_len in min_len..=6 {
-                for min_suffix in 0..=4 {
-                    let ctx = ParallelSaTraverser {
-                        query: view,
-                        target: view,
-                        min_len,
-                        max_len,
-                        max_mm: MAX_MM,
-                        min_prefix: 1,
-                        min_suffix,
-                        on_match: &mut sink,
-                    };
-
-                    // recurse returns at depth >= max_len before consulting
-                    // can_reach_suffix, whose `max_len - depth` underflows there.
-                    for depth in 0..max_len {
-                        for streak in 0..=depth {
-                            for mm in 0..=MAX_MM {
-                                if ctx.can_reach_suffix(depth, streak, mm) {
-                                    continue;
-                                }
-                                for d2 in depth..=max_len {
-                                    for s2 in 0..=d2 {
-                                        for m2 in mm..=MAX_MM {
-                                            if !descendant_is_reachable(
-                                                (depth, streak, mm),
-                                                (d2, s2, m2),
-                                            ) {
-                                                continue;
-                                            }
-                                            assert!(
-                                                !ctx.should_emit(d2, s2, m2),
-                                                "pruned at (depth {depth}, streak {streak}, mm {mm}) but \
-                                                 (depth {d2}, streak {s2}, mm {m2}) is emittable \
-                                                 [min_len {min_len}, max_len {max_len}, min_suffix {min_suffix}]"
-                                            );
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
     }
 }
