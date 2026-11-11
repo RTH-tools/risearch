@@ -5,43 +5,28 @@
 //! unspecified, so a sorted named hit key is the stable contract exercised here.
 //! These compare two production runs against each other.
 //!
-//! The corpus is the shared `tests/data` fixture: 19 transcripts of one gene, so
+//! The corpus is the shared `tests/data` set: 19 transcripts of one gene, so
 //! a query lands in several records at different global offsets, and the same
 //! local sequence recurs across records.  Toy records cannot pose that question.
 
-use super::collect_search_hits;
-use super::tests::{data, fixture};
+use super::test_support::{config, search, QUERIES, TARGETS, TARGET_RECORDS};
 use super::SearchHit;
-use crate::fastx::read_sequences;
 use crate::{Energy, SearchConfig, Sequence, TargetRegistry};
 use std::collections::HashSet;
 use std::num::NonZeroUsize;
-use std::path::Path;
 
-/// Mirrors the search settings of `tests/cli_library_agreement.rs`, plus
-/// alignment columns, which let the hit key separate duplexes sharing a
+/// Mirrors the search settings of `tests/cli_library_agreement.rs`. Alignment
+/// columns, on by default, let the hit key separate duplexes sharing a
 /// bounding box and an energy.
-fn config() -> SearchConfig {
-    let mut config = SearchConfig::default();
-    config.seed.seed_length = Some(6);
-    config.seed.max_mismatches = 2;
-    config.seed.min_prefix_matches = 2;
-    config.seed.min_suffix_matches = 2;
-    config.extend.max_extension = 30;
-    config.extend.build_alignment = true;
-    config.filter.delta_g = Energy::from_kcal(-5.0);
-    config
-}
-
-fn load_records(path: &Path) -> Vec<(String, Sequence)> {
-    read_sequences(path).unwrap()
-}
-
-fn single_records(text: &str) -> Vec<String> {
-    text.split('>')
-        .skip(1)
-        .map(|record| format!(">{record}"))
-        .collect()
+fn agreement_config() -> SearchConfig {
+    config(|c| {
+        c.seed.seed_length = Some(6);
+        c.seed.max_mismatches = 2;
+        c.seed.min_prefix_matches = 2;
+        c.seed.min_suffix_matches = 2;
+        c.extend.max_extension = 30;
+        c.filter.delta_g = Energy::from_kcal(-5.0);
+    })
 }
 
 fn alignment_key(hit: &SearchHit) -> Option<String> {
@@ -98,25 +83,23 @@ fn hit_keys(
 /// 19 is prime, so each group size also leaves a ragged final group.
 #[rstest::rstest]
 fn record_grouping_preserves_named_hits(#[values(1, 4, 7)] group_size: usize) {
-    let config = config();
-    let queries = load_records(&data("query.fa"));
-    let records = load_records(&data("target.fa"));
-    let combined = TargetRegistry::build(records.clone(), Some(NonZeroUsize::MIN)).unwrap();
+    let config = agreement_config();
+    let combined = TargetRegistry::build(TARGET_RECORDS.clone(), Some(NonZeroUsize::MIN)).unwrap();
 
-    let hits = collect_search_hits(&queries, &combined, &config);
+    let hits = search(&QUERIES, &combined, &config).unwrap();
     let touched: HashSet<_> = hits.iter().map(|hit| hit.target_index()).collect();
     assert!(
         touched.len() >= 2,
         "corpus must place hits in more than one record, or grouping is vacuous"
     );
-    let combined_keys = hit_keys(hits, &queries, &combined);
+    let combined_keys = hit_keys(hits, &QUERIES, &combined);
 
     let mut grouped = Vec::new();
-    for group in records.chunks(group_size) {
+    for group in TARGET_RECORDS.chunks(group_size) {
         let part = TargetRegistry::build(group.to_vec(), Some(NonZeroUsize::MIN)).unwrap();
         grouped.extend(hit_keys(
-            collect_search_hits(&queries, &part, &config),
-            &queries,
+            search(&QUERIES, &part, &config).unwrap(),
+            &QUERIES,
             &part,
         ));
     }
@@ -129,20 +112,20 @@ fn record_grouping_preserves_named_hits(#[values(1, 4, 7)] group_size: usize) {
 /// worker, so splitting the query file must not change any query's own hits.
 #[test]
 fn query_partitioning_preserves_named_hits() {
-    let config = config();
-    let target =
-        TargetRegistry::build(load_records(&data("target.fa")), Some(NonZeroUsize::MIN)).unwrap();
-    let all = load_records(&data("query.fa"));
-    let combined_keys = hit_keys(collect_search_hits(&all, &target, &config), &all, &target);
+    let config = agreement_config();
+    let combined_keys = hit_keys(
+        search(&QUERIES, &TARGETS, &config).unwrap(),
+        &QUERIES,
+        &TARGETS,
+    );
     assert!(!combined_keys.is_empty(), "corpus must produce hits");
 
     let mut split = Vec::new();
-    for text in single_records(&fs_err::read_to_string(data("query.fa")).unwrap()) {
-        let one = load_records(fixture(&text).path());
+    for one in QUERIES.chunks(1) {
         split.extend(hit_keys(
-            collect_search_hits(&one, &target, &config),
-            &one,
-            &target,
+            search(one, &TARGETS, &config).unwrap(),
+            one,
+            &TARGETS,
         ));
     }
     split.sort();
@@ -159,12 +142,9 @@ fn query_partitioning_preserves_named_hits() {
 /// so no quantization stands between the two runs.
 #[rstest::rstest]
 fn stricter_cutoff_returns_exactly_the_eligible_hits(#[values(0.1, 0.5, 0.9)] quantile: f64) {
-    let config = config();
-    let queries = load_records(&data("query.fa"));
-    let target =
-        TargetRegistry::build(load_records(&data("target.fa")), Some(NonZeroUsize::MIN)).unwrap();
+    let config = agreement_config();
 
-    let loose_hits = collect_search_hits(&queries, &target, &config);
+    let loose_hits = search(&QUERIES, &TARGETS, &config).unwrap();
     let mut energies: Vec<_> = loose_hits.iter().map(|hit| hit.energy).collect();
     energies.sort();
     energies.dedup();
@@ -182,8 +162,8 @@ fn stricter_cutoff_returns_exactly_the_eligible_hits(#[values(0.1, 0.5, 0.9)] qu
             .into_iter()
             .filter(|hit| hit.energy <= strict.filter.delta_g)
             .collect(),
-        &queries,
-        &target,
+        &QUERIES,
+        &TARGETS,
     );
     assert!(
         !expected.is_empty() && expected.len() < loose_count,
@@ -191,9 +171,9 @@ fn stricter_cutoff_returns_exactly_the_eligible_hits(#[values(0.1, 0.5, 0.9)] qu
     );
 
     let strict_keys = hit_keys(
-        collect_search_hits(&queries, &target, &strict),
-        &queries,
-        &target,
+        search(&QUERIES, &TARGETS, &strict).unwrap(),
+        &QUERIES,
+        &TARGETS,
     );
     assert_eq!(
         strict_keys, expected,
