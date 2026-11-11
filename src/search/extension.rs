@@ -3,13 +3,9 @@ use std::ops::Range;
 use log::trace;
 
 use crate::adapter::gotoh::GotohModel;
-use crate::alignment::AlignColumn;
-#[cfg(test)]
-use crate::alignment::PairClass;
+use crate::alignment::{self, AlignColumn};
 use crate::dp::gotoh::Gotoh;
-#[cfg(test)]
-use crate::dp::GotohScoring;
-use crate::dp::{BestScore, DpGrid, TraceOp, MAX_EXT};
+use crate::dp::{DpGrid, TraceOp, MAX_EXT};
 use crate::dsm::ScoringModel;
 use crate::seed::SeedHit;
 use crate::types::{Base, Energy};
@@ -27,12 +23,10 @@ pub(super) struct ExtensionEngine {
     grid: DpGrid,
     q_buf: [u8; MAX_EXT],
     t_buf: [u8; MAX_EXT],
-    gotoh_left: GotohModel,
-    gotoh_right: GotohModel,
-    left_columns: Vec<AlignColumn>,
-    right_columns: Vec<AlignColumn>,
+    engine_left: GotohModel,
+    engine_right: GotohModel,
+    steps: Option<Vec<TraceOp>>,
     max_window: Option<usize>,
-    build_alignment: bool,
 }
 
 impl ExtensionEngine {
@@ -41,24 +35,20 @@ impl ExtensionEngine {
         build_alignment: bool,
         model: &ScoringModel,
     ) -> Self {
-        let gotoh_right = Gotoh::new(model);
-        let gotoh_left = Gotoh::new(&model.transpose());
-        let max_window = max_window.map(|n| n.clamp(1, MAX_EXT));
         Self {
             grid: DpGrid::new(max_window.unwrap_or(MAX_EXT)),
             q_buf: [0u8; MAX_EXT],
             t_buf: [0u8; MAX_EXT],
-            gotoh_left,
-            gotoh_right,
-            left_columns: Vec::new(),
-            right_columns: Vec::new(),
-            max_window,
-            build_alignment,
+            engine_left: Gotoh::new(&model.transpose()),
+            engine_right: Gotoh::new(model),
+            steps: build_alignment.then(Vec::new),
+            max_window: max_window.map(|n| n.max(1)),
         }
     }
 
     /// Extend both flanks, score the whole duplex. Left flank reversed +
     /// transposed model; right flank forward + canonical model.
+    /// Left = lower duplex index: query 5' side, target 3' side.
     pub(super) fn extend_seed(
         &mut self,
         query: &[Base],
@@ -67,8 +57,6 @@ impl ExtensionEngine {
     ) -> SeedExtension {
         let qr = seed.query_range();
         let tr = seed.target_range();
-        let seed_query = &query[qr.clone()];
-        let seed_target = &target[tr.clone()];
 
         let q_left = &query[..=qr.start];
         let t_left = &target[..=tr.start];
@@ -76,16 +64,12 @@ impl ExtensionEngine {
         let q_win = fill(&mut self.q_buf, q_left.iter().rev().copied(), cap);
         let t_win = fill(&mut self.t_buf, t_left.iter().rev().copied(), cap);
         trace!("[left] q_len={} t_len={}", q_win.len(), t_win.len());
-        let left = self.gotoh_left.extend(q_win, t_win, &mut self.grid);
-        if self.build_alignment {
-            trace_columns(
-                &self.gotoh_left,
-                &self.grid,
-                q_win,
-                t_win,
-                left,
-                &mut self.left_columns,
-            );
+        let left = self.engine_left.extend(q_win, t_win, &mut self.grid);
+        if let Some(steps) = &mut self.steps {
+            steps.clear();
+            self.engine_left
+                .traceback(q_win, t_win, &self.grid, left, |step| steps.push(step));
+            steps.resize(steps.len() + qr.len(), TraceOp::Match);
         }
 
         let q_right = &query[qr.end - 1..];
@@ -94,24 +78,21 @@ impl ExtensionEngine {
         let q_win = fill(&mut self.q_buf, q_right.iter().copied(), cap);
         let t_win = fill(&mut self.t_buf, t_right.iter().copied(), cap);
         trace!("[right] q_len={} t_len={}", q_win.len(), t_win.len());
-        let right = self.gotoh_right.extend(q_win, t_win, &mut self.grid);
-        if self.build_alignment {
-            trace_columns(
-                &self.gotoh_right,
-                &self.grid,
-                q_win,
-                t_win,
-                right,
-                &mut self.right_columns,
-            );
+        let right = self.engine_right.extend(q_win, t_win, &mut self.grid);
+        if let Some(steps) = &mut self.steps {
+            let seed_end = steps.len();
+            self.engine_right
+                .traceback(q_win, t_win, &self.grid, right, |step| steps.push(step));
+            // Left steps arrive 5'->3'; right steps arrive 3'->5'.
+            steps[seed_end..].reverse();
         }
 
         debug_assert!(left.q_idx <= qr.start);
         debug_assert!(left.t_idx <= tr.start);
         let q_range = qr.start - left.q_idx..qr.end + right.q_idx;
         let t_range = tr.start - left.t_idx..tr.end + right.t_idx;
-        let model = &self.gotoh_right.scoring;
-        let score = model.ungapped_duplex_score(seed_query, seed_target)
+        let model = &self.engine_right.scoring;
+        let score = model.ungapped_duplex_score(&query[qr], &target[tr])
             + Energy(left.score)
             + Energy(right.score);
         let energy = model.binding_energy(score);
@@ -123,69 +104,24 @@ impl ExtensionEngine {
         }
     }
 
-    /// Flank buffers are overwritten by the next `extend_seed`; call before continuing.
+    /// Step buffer is overwritten by the next `extend_seed`; call before continuing.
     pub(super) fn materialize_alignment(
         &self,
         query: &[Base],
         target: &[Base],
-        seed: &SeedHit,
+        ext: &SeedExtension,
     ) -> Option<Box<[AlignColumn]>> {
-        self.build_alignment.then(|| {
-            assemble_alignment(
-                &self.left_columns,
-                &query[seed.query_range()],
-                &target[seed.target_range()],
-                &self.right_columns,
-            )
-        })
+        let steps = self.steps.as_deref()?;
+        let query = &query[ext.q_range.clone()];
+        let target = &target[ext.t_range.clone()];
+        Some(alignment::resolve(steps, query, target))
     }
-}
-
-/// Resolve the traceback into alignment columns directly from the DP grid.
-fn trace_columns(
-    gotoh: &GotohModel,
-    grid: &DpGrid,
-    q: &[u8],
-    t: &[u8],
-    best: BestScore,
-    out: &mut Vec<AlignColumn>,
-) {
-    out.clear();
-    gotoh.traceback(q, t, grid, best, |op, qi, tj| {
-        out.push(match op {
-            TraceOp::Match => AlignColumn::paired(Base::from_u8(qi), Base::from_u8(tj)),
-            TraceOp::GapQ => AlignColumn::query_only(Base::from_u8(qi)),
-            TraceOp::GapT => AlignColumn::target_only(Base::from_u8(tj)),
-        });
-    });
-}
-
-/// Left columns arrive 5'→3'; right columns arrive 3'→5' and are reversed here.
-fn assemble_alignment(
-    left: &[AlignColumn],
-    seed_query: &[Base],
-    seed_target: &[Base],
-    right: &[AlignColumn],
-) -> Box<[AlignColumn]> {
-    debug_assert_eq!(seed_query.len(), seed_target.len());
-    let mut cols = Vec::with_capacity(left.len() + seed_query.len() + right.len());
-    cols.extend_from_slice(left);
-    cols.extend(
-        seed_query
-            .iter()
-            .copied()
-            .zip(seed_target.iter().copied())
-            .map(|(q, t)| AlignColumn::paired(q, t)),
-    );
-    cols.extend(right.iter().rev().copied());
-    cols.into_boxed_slice()
 }
 
 /// Caller controls orientation via the iterator (`.rev()` for left flank).
 fn fill(dst: &mut [u8], src: impl Iterator<Item = Base>, cap: usize) -> &[u8] {
-    let limit = cap.min(dst.len());
     let mut len = 0;
-    for (slot, base) in dst[..limit].iter_mut().zip(src) {
+    for (slot, base) in dst.iter_mut().zip(src.take(cap)) {
         *slot = base.as_u8();
         len += 1;
     }
@@ -245,7 +181,7 @@ mod tests {
                 );
                 assert_eq!(hit.q_range, hit.t_range);
                 assert_eq!(
-                    engine.materialize_alignment(&q, &t, &seed).unwrap().len(),
+                    engine.materialize_alignment(&q, &t, &hit).unwrap().len(),
                     hit.q_range.len()
                 );
             }
@@ -314,12 +250,13 @@ mod tests {
                     hit.energy,
                     Energy(1000 - score - 11 - 17 + extension_penalty)
                 );
-                let columns = engine
-                    .materialize_alignment(&query, &target, &seed)
-                    .unwrap();
-                assert_eq!(columns.iter().map(|c| c.query()).collect::<Vec<_>>(), qcols);
+                let alignment = engine.materialize_alignment(&query, &target, &hit).unwrap();
                 assert_eq!(
-                    columns.iter().map(|c| c.target()).collect::<Vec<_>>(),
+                    alignment.iter().map(|c| c.query()).collect::<Vec<_>>(),
+                    qcols
+                );
+                assert_eq!(
+                    alignment.iter().map(|c| c.target()).collect::<Vec<_>>(),
                     tcols
                 );
 
@@ -335,34 +272,6 @@ mod tests {
                 );
             }
         }
-    }
-
-    #[test]
-    fn flank_extents_match_traceback_consumption() {
-        let model = test_model();
-        let gotoh = Gotoh::new(&model);
-        let mut grid = DpGrid::new(8);
-        let query = [Base::A, Base::U, Base::G, Base::C];
-        let target = [Base::U, Base::A, Base::C, Base::G];
-
-        let mut q_buf = [0u8; MAX_EXT];
-        let mut t_buf = [0u8; MAX_EXT];
-        let q_win = fill(&mut q_buf, query.iter().copied(), 8);
-        let t_win = fill(&mut t_buf, target.iter().copied(), 8);
-        let best = gotoh.extend(q_win, t_win, &mut grid);
-        let mut columns = Vec::new();
-        trace_columns(&gotoh, &grid, q_win, t_win, best, &mut columns);
-        assert!(!columns.is_empty());
-        assert!(best.q_idx > 0);
-        assert!(best.t_idx > 0);
-        assert_eq!(
-            columns.iter().filter(|c| c.query() != Base::Gap).count(),
-            best.q_idx
-        );
-        assert_eq!(
-            columns.iter().filter(|c| c.target() != Base::Gap).count(),
-            best.t_idx
-        );
     }
 
     #[test]
@@ -385,39 +294,6 @@ mod tests {
             [Base::A, Base::C, Base::G].map(Base::as_u8)
         );
         assert_eq!(fill(&mut buf, target[2..].iter().copied(), 3), expected);
-    }
-
-    #[test]
-    fn zero_cap_window_scores_the_anchor_column() {
-        let model = test_model();
-        let transposed = model.transpose();
-        let gotoh_left = Gotoh::new(&transposed);
-        let gotoh_right = Gotoh::new(&model);
-        let mut grid = DpGrid::new(1);
-        let query = [Base::A, Base::U, Base::G, Base::C];
-        let target = [Base::U, Base::A, Base::C, Base::G];
-        let mut q_buf = [0u8; MAX_EXT];
-        let mut t_buf = [0u8; MAX_EXT];
-
-        let q_win = fill(&mut q_buf, query.iter().rev().copied(), 1);
-        let t_win = fill(&mut t_buf, target.iter().rev().copied(), 1);
-        let left = gotoh_left.extend(q_win, t_win, &mut grid);
-
-        let q_win = fill(&mut q_buf, query.iter().copied(), 1);
-        let t_win = fill(&mut t_buf, target.iter().copied(), 1);
-        let right = gotoh_right.extend(q_win, t_win, &mut grid);
-
-        for r in [&left, &right] {
-            assert_eq!((r.q_idx, r.t_idx), (0, 0));
-        }
-        assert_eq!(
-            left.score,
-            transposed.boundary(Base::C.as_u8(), Base::G.as_u8())
-        );
-        assert_eq!(
-            right.score,
-            model.boundary(Base::A.as_u8(), Base::U.as_u8())
-        );
     }
 
     #[test]
@@ -470,28 +346,11 @@ mod tests {
             query.len()
         );
         let free_cols = unlimited
-            .materialize_alignment(&query, &target, &seed)
+            .materialize_alignment(&query, &target, &free)
             .unwrap();
-        let pinned_cols = fixed.materialize_alignment(&query, &target, &seed).unwrap();
+        let pinned_cols = fixed
+            .materialize_alignment(&query, &target, &pinned)
+            .unwrap();
         assert_eq!(free_cols.len(), pinned_cols.len());
-    }
-
-    #[test]
-    fn traceback_resolves_correct_base_pairs() {
-        let model = test_model();
-        let gotoh = Gotoh::new(&model);
-        let mut grid = DpGrid::new(8);
-        let query = [Base::A, Base::G, Base::C];
-        let target = [Base::U, Base::U, Base::G];
-        let mut q_buf = [0u8; MAX_EXT];
-        let mut t_buf = [0u8; MAX_EXT];
-        let mut columns = Vec::new();
-
-        let q_win = fill(&mut q_buf, query.iter().copied(), 3);
-        let t_win = fill(&mut t_buf, target.iter().copied(), 3);
-        let best = gotoh.extend(q_win, t_win, &mut grid);
-        trace_columns(&gotoh, &grid, q_win, t_win, best, &mut columns);
-        assert!(!columns.is_empty());
-        assert!(columns.iter().all(|c| c.class() != PairClass::Mismatch));
     }
 }

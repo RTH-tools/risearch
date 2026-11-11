@@ -295,7 +295,7 @@ impl SearchWorker {
             let ext = self.extension.extend_seed(query, target, &seed);
 
             if ext.energy <= opts.filter.delta_g {
-                let alignment = self.extension.materialize_alignment(query, target, &seed);
+                let alignment = self.extension.materialize_alignment(query, target, &ext);
                 hits.push(SearchHit::new(query_idx, &seed, ext, alignment, tview));
             }
         })?;

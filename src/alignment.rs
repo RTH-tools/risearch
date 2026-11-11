@@ -3,6 +3,7 @@
 //! A traceback yields a run of [`AlignColumn`]s in physical duplex order, each
 //! carrying its [`PairClass`].
 
+use crate::dp::TraceOp;
 use crate::types::{Base, PairType};
 
 /// How one duplex column pairs.
@@ -88,44 +89,12 @@ impl AlignColumn {
         self.target
     }
 
-    /// A diagonal traceback step consuming both inputs.
+    /// A column of two physical bases; [`Base::Gap`] marks an unconsumed side.
     #[inline]
-    pub const fn paired(query: Base, target: Base) -> Self {
-        debug_assert!(
-            !matches!(query, Base::Gap) && !matches!(target, Base::Gap),
-            "a paired column must consume two non-gap inputs"
-        );
+    pub const fn new(query: Base, target: Base) -> Self {
         Self {
             class: PairClass::from_bases(query, target),
             query,
-            target,
-        }
-    }
-
-    /// A traceback step consuming only the query input.
-    #[inline]
-    pub const fn query_only(query: Base) -> Self {
-        debug_assert!(
-            !matches!(query, Base::Gap),
-            "a query-only column must consume a non-gap input"
-        );
-        Self {
-            class: PairClass::QueryBulge,
-            query,
-            target: Base::Gap,
-        }
-    }
-
-    /// A traceback step consuming only the target input.
-    #[inline]
-    pub const fn target_only(target: Base) -> Self {
-        debug_assert!(
-            !matches!(target, Base::Gap),
-            "a target-only column must consume a non-gap input"
-        );
-        Self {
-            class: PairClass::TargetBulge,
-            query: Base::Gap,
             target,
         }
     }
@@ -140,13 +109,26 @@ pub fn fingerprint_symbols(columns: &[AlignColumn]) -> impl Iterator<Item = char
     columns.iter().map(|column| column.class().symbol())
 }
 
+/// Resolve duplex-ordered traceback steps against the spans they consume.
+pub(crate) fn resolve(steps: &[TraceOp], query: &[Base], target: &[Base]) -> Box<[AlignColumn]> {
+    let (mut q, mut t) = (query.iter().copied(), target.iter().copied());
+    steps
+        .iter()
+        .map(|step| match step {
+            TraceOp::Match => AlignColumn::new(q.next().unwrap(), t.next().unwrap()),
+            TraceOp::GapQ => AlignColumn::new(q.next().unwrap(), Base::Gap),
+            TraceOp::GapT => AlignColumn::new(Base::Gap, t.next().unwrap()),
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn columns_mark_the_unconsumed_input_with_gap() {
-        let target_only = AlignColumn::target_only(Base::U);
+        let target_only = AlignColumn::new(Base::Gap, Base::U);
 
         assert_eq!(
             target_only,

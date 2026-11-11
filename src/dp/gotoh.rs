@@ -95,14 +95,14 @@ impl<S: GotohScoring> Gotoh<S> {
     }
 
     /// Walk the filled grid backward from `best` to recover the state-transition
-    /// path, emitting each step's op and the consumed symbols to the closure.
+    /// path, emitting each step to the closure, endpoint first.
     pub(crate) fn traceback(
         &self,
         q: &[u8],
         t: &[u8],
         grid: &DpGrid,
         best: BestScore,
-        mut emit: impl FnMut(TraceOp, u8, u8),
+        mut emit: impl FnMut(TraceOp),
     ) {
         let (mut i, mut j) = (best.q_idx, best.t_idx);
         let mut state = TraceOp::Match;
@@ -118,7 +118,7 @@ impl<S: GotohScoring> Gotoh<S> {
                     let tj_prev = t[j - 1];
                     let tj = t[j];
 
-                    emit(TraceOp::Match, qi, tj);
+                    emit(TraceOp::Match);
 
                     let r#match = self.scoring.r#match(qi_prev, qi, tj_prev, tj);
                     let close_query_gap = self.scoring.close_query_gap(qi_prev, qi, tj);
@@ -149,7 +149,7 @@ impl<S: GotohScoring> Gotoh<S> {
                     let qi = q[i];
                     let tj = t[j];
 
-                    emit(TraceOp::GapQ, qi, tj);
+                    emit(TraceOp::GapQ);
 
                     let open_query_gap = self.scoring.open_query_gap(qi_prev, qi, tj);
                     let extend_query_gap = self.scoring.extend_query_gap(qi_prev, qi);
@@ -176,7 +176,7 @@ impl<S: GotohScoring> Gotoh<S> {
                     let tj_prev = t[j - 1];
                     let tj = t[j];
 
-                    emit(TraceOp::GapT, qi, tj);
+                    emit(TraceOp::GapT);
 
                     let open_target_gap = self.scoring.open_target_gap(qi, tj_prev, tj);
                     let extend_target_gap = self.scoring.extend_target_gap(tj_prev, tj);

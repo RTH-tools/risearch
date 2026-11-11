@@ -183,14 +183,14 @@ mod tests {
     #[test]
     fn detailed_rows_preserve_asymmetry_gaps_wobble_and_trailing_space() {
         let alignment = [
-            AlignColumn::paired(Base::A, Base::U),
-            AlignColumn::paired(Base::C, Base::G),
-            AlignColumn::paired(Base::G, Base::U),
-            AlignColumn::paired(Base::U, Base::U),
-            AlignColumn::query_only(Base::G),
-            AlignColumn::target_only(Base::A),
-            AlignColumn::paired(Base::C, Base::G),
-            AlignColumn::paired(Base::A, Base::A),
+            AlignColumn::new(Base::A, Base::U),
+            AlignColumn::new(Base::C, Base::G),
+            AlignColumn::new(Base::G, Base::U),
+            AlignColumn::new(Base::U, Base::U),
+            AlignColumn::new(Base::G, Base::Gap),
+            AlignColumn::new(Base::Gap, Base::A),
+            AlignColumn::new(Base::C, Base::G),
+            AlignColumn::new(Base::A, Base::A),
         ];
         let hit = SearchHit {
             query_idx: 0,
@@ -248,14 +248,14 @@ mod tests {
     #[test]
     fn cigar_rows_carry_the_pairing_symbol_string() {
         let alignment = [
-            AlignColumn::paired(Base::A, Base::U),
-            AlignColumn::paired(Base::C, Base::G),
-            AlignColumn::paired(Base::G, Base::U),
-            AlignColumn::paired(Base::U, Base::U),
-            AlignColumn::query_only(Base::G),
-            AlignColumn::target_only(Base::A),
-            AlignColumn::paired(Base::C, Base::G),
-            AlignColumn::paired(Base::A, Base::A),
+            AlignColumn::new(Base::A, Base::U),
+            AlignColumn::new(Base::C, Base::G),
+            AlignColumn::new(Base::G, Base::U),
+            AlignColumn::new(Base::U, Base::U),
+            AlignColumn::new(Base::G, Base::Gap),
+            AlignColumn::new(Base::Gap, Base::A),
+            AlignColumn::new(Base::C, Base::G),
+            AlignColumn::new(Base::A, Base::A),
         ];
         let hit = SearchHit {
             query_idx: 0,

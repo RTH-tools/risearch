@@ -412,7 +412,7 @@ fn assert_trace_matches_reference(
     expected_trace: &[TraceOp],
 ) {
     let mut prod_trace = Vec::new();
-    engine.traceback(query, target, grid, *best, |op, _, _| prod_trace.push(op));
+    engine.traceback(query, target, grid, *best, |op| prod_trace.push(op));
     assert_eq!(
         prod_trace.as_slice(),
         expected_trace,

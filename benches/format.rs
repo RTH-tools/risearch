@@ -19,7 +19,7 @@ fn setup_hit() -> (SearchHit, Vec<Base>, Vec<Base>) {
         .iter()
         .copied()
         .zip(target.iter().copied())
-        .map(|(q, t)| AlignColumn::paired(q, t))
+        .map(|(q, t)| AlignColumn::new(q, t))
         .collect::<Vec<_>>()
         .into_boxed_slice();
 
