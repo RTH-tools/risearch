@@ -116,41 +116,22 @@ impl HitSink for VecSink {
     }
 }
 
-/// Key identifying one final bounding box: a `(query, target, strand)` plus the
-/// extended span. Overlapping seeds that converge on the same box collapse to
-/// one row under [`SearchHit::cmp`].
-#[derive(PartialEq, Eq, Hash)]
-struct BoxKey {
-    query_idx: u32,
-    target_idx: u32,
-    strand: Strand,
-    q_start: usize,
-    q_end: usize,
-    t_start: usize,
-    t_end: usize,
-}
-
-impl BoxKey {
-    fn of(hit: &SearchHit) -> Self {
-        Self {
-            query_idx: hit.query_idx,
-            target_idx: hit.target_idx,
-            strand: hit.strand,
-            q_start: hit.q_start,
-            q_end: hit.q_end,
-            t_start: hit.t_start,
-            t_end: hit.t_end,
-        }
-    }
-}
-
-/// Collapse hits sharing a [`BoxKey`] to the single best one. Caller guarantees
-/// all hits belong to one query, so this is globally exact for that query.
+/// Collapse hits sharing a bounding box (target, strand and extended span) to
+/// the single best one under [`SearchHit::cmp`]. Caller guarantees all hits
+/// belong to one query, so this is globally exact for that query.
 fn dedup_hits(hits: Vec<SearchHit>) -> Vec<SearchHit> {
     use std::collections::hash_map::Entry;
-    let mut best: HashMap<BoxKey, SearchHit> = HashMap::with_capacity(hits.len());
+    let mut best = HashMap::with_capacity(hits.len());
     for hit in hits {
-        match best.entry(BoxKey::of(&hit)) {
+        let key = (
+            hit.target_idx,
+            hit.strand,
+            hit.q_start,
+            hit.q_end,
+            hit.t_start,
+            hit.t_end,
+        );
+        match best.entry(key) {
             Entry::Occupied(mut e) => {
                 if hit.cmp(e.get()).is_lt() {
                     e.insert(hit);
@@ -335,7 +316,7 @@ fn inclusive_bounds(mut range: Range<usize>) -> (usize, usize) {
 }
 
 impl SearchHit {
-    /// Compare two candidates for the same [`BoxKey`].
+    /// Compare two candidates for the same bounding box.
     ///
     /// `Less` means `self` is retained, `Greater` means `other` is retained, and
     /// `Equal` means they are indistinguishable under the deduplication policy.
