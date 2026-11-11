@@ -405,6 +405,7 @@ mod tests {
     use crate::output::TextSink;
     use crate::types::DsmId;
     use crate::Sequence;
+    use rstest::rstest;
 
     fn detailed_output() -> OutputConfig {
         OutputConfig {
@@ -894,76 +895,38 @@ mod tests {
         target.into_iter().collect()
     }
 
-    fn planted_config(seed_len: i64) -> SearchConfig {
-        config(|c| {
-            c.seed.seed_length = Some(seed_len);
+    /// A site planted at a known offset comes back at exactly that FASTA span,
+    /// on the strand it was planted for.
+    #[rstest]
+    fn planted_duplex_lands_at_its_fasta_position(
+        #[values(Strand::Forward, Strand::Reverse)] strand: Strand,
+        #[values((50, 0), (50, 5), (50, 20), (50, 43), (30, 3), (80, 60), (15, 8))] placement: (
+            usize,
+            usize,
+        ),
+    ) {
+        let query = "UGCAUGU";
+        let (target_len, offset) = placement;
+        // Forward FASTA is reverse(physical); reverse FASTA is complement(physical).
+        let site = match strand {
+            Strand::Forward => revcomp(query),
+            Strand::Reverse => query.to_string(),
+        };
+        let target = plant_site('A', target_len, offset, &site);
+        let config = config(|c| {
+            c.seed.seed_length = Some(query.len() as i64);
             c.seed.no_max_prune = true;
             c.extend.max_extension = 0;
             c.filter.delta_g = Energy::from_kcal(100_000.0);
-        })
-    }
+        });
 
-    #[test]
-    fn planted_duplexes_land_at_known_fasta_positions() {
-        let query = "UGCAUGU";
-        let query_rc = revcomp(query);
-        assert_ne!(query, &query_rc, "test needs a non-palindromic query");
+        let hits = search_pair(query, &target, &config).unwrap();
 
-        let seed_len = query.len() as i64;
-        let total_len = 50;
-
-        let config = planted_config(seed_len);
-
-        for (strand, site_bases, label) in [
-            (Strand::Forward, query_rc.as_str(), "forward"),
-            (Strand::Reverse, query, "reverse"),
-        ] {
-            let site_len = site_bases.len();
-            for &offset in &[0usize, 5, 20, total_len - site_len] {
-                let target = plant_site('A', total_len, offset, site_bases);
-                let hits = search_pair(query, &target, &config).unwrap();
-
-                let expected_start = offset;
-                let expected_end = offset + site_len - 1;
-
-                let found = hits.iter().any(|h| {
-                    h.strand == strand && h.t_start == expected_start && h.t_end == expected_end
-                });
-                assert!(
-                    found,
-                    "{label} offset={offset}: expected hit at t_start={expected_start} \
-                     t_end={expected_end} strand={strand}, got {hits:?}",
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn planted_duplexes_land_in_targets_of_varying_length() {
-        let query = "UGCAUGU";
-        let query_rc = revcomp(query);
-        let seed_len = query.len() as i64;
-
-        let config = planted_config(seed_len);
-
-        for &(total_len, offset) in &[(30usize, 3usize), (80, 60), (15, 8)] {
-            let target = plant_site('A', total_len, offset, &query_rc);
-            let hits = search_pair(query, &target, &config).unwrap();
-
-            let expected_start = offset;
-            let expected_end = offset + query.len() - 1;
-
-            let found = hits.iter().any(|h| {
-                h.strand == Strand::Forward
-                    && h.t_start == expected_start
-                    && h.t_end == expected_end
-            });
-            assert!(
-                found,
-                "target_len={total_len} offset={offset}: expected forward hit at \
-                 {expected_start}..={expected_end}, got {hits:?}",
-            );
-        }
+        let span = (strand, offset, offset + query.len() - 1);
+        assert!(
+            hits.iter().any(|h| (h.strand, h.t_start, h.t_end) == span),
+            "expected {span:?}, got {hits:?}"
+        );
     }
 
     #[cfg(not(miri))]
