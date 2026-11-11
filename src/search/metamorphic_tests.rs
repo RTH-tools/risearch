@@ -45,22 +45,19 @@ fn alignment_key(hit: &SearchHit) -> Option<String> {
     })
 }
 
-fn hit_key(hit: &SearchHit, queries: &[(String, Sequence)], targets: &TargetRegistry) -> String {
-    // Energy is integer-scaled internally.  Re-quantizing the public kcal/mol
-    // value keeps this helper independent of the private representation while
-    // retaining exact equality at the advertised precision.
-    let energy = (hit.energy.to_kcal() * 10_000.0).round() as i64;
-    format!(
-        "{}\0{}\0{}:{}\0{}:{}\0{}\0{}\0{}",
-        queries[hit.query_idx as usize].0,
-        targets.get_name(hit.target_index()),
-        hit.q_start,
-        hit.q_end,
-        hit.t_start,
-        hit.t_end,
+fn hit_key(
+    hit: &SearchHit,
+    queries: &[(String, Sequence)],
+    targets: &TargetRegistry,
+) -> impl Ord + std::fmt::Debug {
+    (
+        queries[hit.query_idx as usize].0.clone(),
+        targets.get_name(hit.target_index()).to_string(),
+        (hit.q_start, hit.q_end),
+        (hit.t_start, hit.t_end),
         hit.strand,
-        energy,
-        alignment_key(hit).unwrap_or_default()
+        hit.energy,
+        alignment_key(hit),
     )
 }
 
@@ -68,10 +65,10 @@ fn hit_keys(
     hits: Vec<SearchHit>,
     queries: &[(String, Sequence)],
     targets: &TargetRegistry,
-) -> Vec<String> {
+) -> Vec<impl Ord + std::fmt::Debug> {
     let mut keys: Vec<_> = hits
-        .into_iter()
-        .map(|hit| hit_key(&hit, queries, targets))
+        .iter()
+        .map(|hit| hit_key(hit, queries, targets))
         .collect();
     keys.sort();
     keys
