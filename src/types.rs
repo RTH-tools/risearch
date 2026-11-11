@@ -154,18 +154,6 @@ impl std::fmt::Display for Strand {
     }
 }
 
-impl TryFrom<char> for Strand {
-    type Error = String;
-
-    fn try_from(c: char) -> Result<Self, Self::Error> {
-        match c {
-            '+' => Ok(Strand::Forward),
-            '-' => Ok(Strand::Reverse),
-            _ => Err(format!("invalid strand '{c}'")),
-        }
-    }
-}
-
 impl From<Strand> for char {
     fn from(s: Strand) -> char {
         match s {
@@ -396,16 +384,9 @@ mod tests {
     }
 
     #[test]
-    fn strand_round_trips_through_its_symbol() {
-        assert_eq!(Strand::try_from('+'), Ok(Strand::Forward));
-        assert_eq!(Strand::try_from('-'), Ok(Strand::Reverse));
+    fn strand_displays_its_symbol_and_orders_forward_first() {
         assert_eq!(Strand::Forward.to_string(), "+");
         assert_eq!(Strand::Reverse.to_string(), "-");
-    }
-
-    #[test]
-    fn strand_rejects_other_symbols_and_orders_forward_first() {
-        assert_eq!(Strand::try_from('x'), Err("invalid strand 'x'".to_string()));
         assert!(Strand::Forward < Strand::Reverse);
     }
 
