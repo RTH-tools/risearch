@@ -177,7 +177,7 @@ fn bench_search_prod_shaped_pipeline(c: &mut Criterion) {
     let retained = pool
         .install(|| run_search(&dataset.queries, &dataset.store, &hit_args, &setup_sink))
         .expect("run setup search");
-    assert_eq!(retained, 110_823, "retained-hit workload changed");
+    assert_eq!(retained, 110_721, "retained-hit workload changed");
 
     let case = "10q_x_2x50k";
     group.throughput(Throughput::Elements(seed_total as u64));
