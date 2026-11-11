@@ -1,31 +1,12 @@
 //! Schema and columnar conversion for the Arrow search result.
 
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex};
 
 use arrow_array::builder::{Float64Builder, LargeStringBuilder, StringBuilder, UInt64Builder};
 use arrow_array::{ArrayRef, RecordBatch};
-use arrow_schema::{DataType, Field, Schema, SchemaRef};
+use arrow_schema::{DataType, Field, Schema};
 use risearch::alignment::fingerprint_symbols;
 use risearch::{HitSink, Result, SearchHit, Sequence, TargetRegistry};
-
-pub(crate) fn search_result_schema() -> &'static SchemaRef {
-    static SCHEMA: OnceLock<SchemaRef> = OnceLock::new();
-    SCHEMA.get_or_init(|| {
-        Arc::new(Schema::new(vec![
-            Field::new("query_idx", DataType::UInt64, false),
-            Field::new("query_name", DataType::Utf8, false),
-            Field::new("target_idx", DataType::UInt64, false),
-            Field::new("target_name", DataType::Utf8, false),
-            Field::new("q_start", DataType::UInt64, false),
-            Field::new("q_end", DataType::UInt64, false),
-            Field::new("t_start", DataType::UInt64, false),
-            Field::new("t_end", DataType::UInt64, false),
-            Field::new("strand", DataType::Utf8, false),
-            Field::new("energy", DataType::Float64, false),
-            Field::new("alignment", DataType::LargeUtf8, true),
-        ]))
-    })
-}
 
 #[derive(Default)]
 struct HitColumns {
@@ -59,7 +40,20 @@ impl<'a> ArrowSink<'a> {
         }
     }
 
-    pub(crate) fn into_batch(self, schema: &SchemaRef) -> RecordBatch {
+    pub(crate) fn into_batch(self) -> RecordBatch {
+        let schema = Schema::new(vec![
+            Field::new("query_idx", DataType::UInt64, false),
+            Field::new("query_name", DataType::Utf8, false),
+            Field::new("target_idx", DataType::UInt64, false),
+            Field::new("target_name", DataType::Utf8, false),
+            Field::new("q_start", DataType::UInt64, false),
+            Field::new("q_end", DataType::UInt64, false),
+            Field::new("t_start", DataType::UInt64, false),
+            Field::new("t_end", DataType::UInt64, false),
+            Field::new("strand", DataType::Utf8, false),
+            Field::new("energy", DataType::Float64, false),
+            Field::new("alignment", DataType::LargeUtf8, true),
+        ]);
         let mut c = self.columns.into_inner().unwrap();
         let columns: Vec<ArrayRef> = vec![
             Arc::new(c.query_idx.finish()),
@@ -74,7 +68,8 @@ impl<'a> ArrowSink<'a> {
             Arc::new(c.energy.finish()),
             Arc::new(c.alignment.finish()),
         ];
-        RecordBatch::try_new(schema.clone(), columns).expect("column count and types match schema")
+        RecordBatch::try_new(Arc::new(schema), columns)
+            .expect("column count and types match schema")
     }
 }
 

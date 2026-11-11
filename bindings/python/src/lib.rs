@@ -6,7 +6,6 @@ use std::path::PathBuf;
 
 use arrow_array::ffi_stream::FFI_ArrowArrayStream;
 use arrow_array::{RecordBatch, RecordBatchIterator};
-use arrow_schema::SchemaRef;
 use pyo3::prelude::*;
 use pyo3::types::{PyCapsule, PyDict};
 use risearch::fastx::read_sequences;
@@ -15,7 +14,7 @@ use risearch::{
     TargetRegistry,
 };
 
-use crate::arrow::{search_result_schema, ArrowSink};
+use crate::arrow::ArrowSink;
 use crate::error::Result;
 
 // =============================================================================
@@ -29,16 +28,6 @@ use crate::error::Result;
 #[pyclass(name = "SearchResult", module = "risearch._native")]
 struct PySearchResult {
     batch: Option<RecordBatch>,
-    schema: SchemaRef,
-}
-
-impl PySearchResult {
-    fn new(batch: RecordBatch, schema: SchemaRef) -> Self {
-        Self {
-            batch: Some(batch),
-            schema,
-        }
-    }
 }
 
 #[pymethods]
@@ -59,7 +48,8 @@ impl PySearchResult {
             .take()
             .ok_or_else(|| pyo3::exceptions::PyIOError::new_err("Arrow stream already consumed"))?;
 
-        let reader = RecordBatchIterator::new(std::iter::once(Ok(batch)), self.schema.clone());
+        let schema = batch.schema();
+        let reader = RecordBatchIterator::new(std::iter::once(Ok(batch)), schema);
         let stream = FFI_ArrowArrayStream::new(Box::new(reader));
 
         PyCapsule::new_with_value(py, stream, c"arrow_array_stream")
@@ -295,8 +285,9 @@ fn search(
             run_search(&queries, &target.0, &config, &sink)
         })
     })?;
-    let schema = search_result_schema().clone();
-    Ok(PySearchResult::new(sink.into_batch(&schema), schema))
+    Ok(PySearchResult {
+        batch: Some(sink.into_batch()),
+    })
 }
 
 // =============================================================================
