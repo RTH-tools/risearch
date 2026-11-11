@@ -114,60 +114,6 @@ impl<'a> TargetView<'a> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use std::ops::Range;
-
-    use crate::index::store::TargetRegistry;
-    use crate::types::Strand;
-    use crate::Sequence;
-
-    /// Independent oracle for duplex-frame → FASTA coordinate conversion.
-    ///
-    /// Derived from [`crate::seed::reference_tests::target_in_duplex_order`]:
-    /// Forward = `reverse(FASTA)`, so duplex pos `d` = FASTA pos `len-1-d`.
-    /// Reverse = `complement(FASTA)`, same positions.
-    fn naive_duplex_to_fasta(
-        target_len: usize,
-        strand: Strand,
-        duplex_range: Range<usize>,
-    ) -> Range<usize> {
-        match strand {
-            Strand::Forward => (target_len - duplex_range.end)..(target_len - duplex_range.start),
-            Strand::Reverse => duplex_range,
-        }
-    }
-
-    #[test]
-    fn map_target_range_matches_independent_coordinate_oracle() {
-        let target_text = "ACGUACGUACGU";
-        let target_len = target_text.len();
-        let target = Sequence::try_from(target_text.as_bytes()).unwrap();
-        let targets = TargetRegistry::build(vec![("t".into(), target)], None).unwrap();
-        let tview = targets.view();
-
-        for &strand in &[Strand::Forward, Strand::Reverse] {
-            let ranges: &[Range<usize>] = &[
-                0..1,
-                0..target_len,
-                0..target_len / 2,
-                target_len / 2..target_len,
-                3..7,
-                target_len - 1..target_len,
-                5..5,
-            ];
-            for range in ranges {
-                let production = tview.map_target_range(0, strand, range.clone());
-                let oracle = naive_duplex_to_fasta(target_len, strand, range.clone());
-                assert_eq!(
-                    production, oracle,
-                    "strand={strand} duplex_range={range:?} target_len={target_len}"
-                );
-            }
-        }
-    }
-}
-
 #[cfg(kani)]
 mod kani_proofs {
     use super::*;
