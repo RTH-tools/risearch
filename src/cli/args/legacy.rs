@@ -307,7 +307,7 @@ mod tests {
         let args = parse(&["-t", "t.idx", "--noGUseed"])
             .unwrap()
             .resolve_legacy();
-        let config = SeedConfig::try_from(args.seed).unwrap();
+        let config = SeedConfig::from(args.seed);
         assert!(!config.seed_wobble);
     }
 

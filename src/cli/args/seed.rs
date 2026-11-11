@@ -1,4 +1,3 @@
-use anyhow::Error;
 use risearch::config::{SeedConfig, DEFAULT_SEED_LEN};
 
 /// Arguments for seed generation
@@ -89,11 +88,9 @@ pub(crate) struct SeedArgs {
     pub(crate) mismatch_suffix: usize,
 }
 
-impl TryFrom<SeedArgs> for SeedConfig {
-    type Error = Error;
-
-    fn try_from(value: SeedArgs) -> Result<Self, Self::Error> {
-        let config = SeedConfig {
+impl From<SeedArgs> for SeedConfig {
+    fn from(value: SeedArgs) -> Self {
+        SeedConfig {
             seed_start: value.seed_start,
             seed_end: value.seed_end,
             seed_length: value.seed_length,
@@ -102,30 +99,6 @@ impl TryFrom<SeedArgs> for SeedConfig {
             max_mismatches: value.mismatch_max,
             min_prefix_matches: value.mismatch_prefix,
             min_suffix_matches: value.mismatch_suffix,
-        };
-        config.validate().map_err(Error::msg)?;
-        Ok(config)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::SeedArgs;
-    use risearch::config::SeedConfig;
-
-    #[test]
-    fn seed_args_conversion_is_fallible_for_invalid_partial_seed_bounds() {
-        let args = SeedArgs {
-            seed_start: Some(3),
-            seed_end: None,
-            seed_length: None,
-            seed_wobble: false,
-            no_max_prune: false,
-            mismatch_max: 0,
-            mismatch_prefix: 1,
-            mismatch_suffix: 1,
-        };
-
-        assert!(SeedConfig::try_from(args).is_err());
+        }
     }
 }

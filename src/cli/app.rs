@@ -46,12 +46,6 @@ fn cmd_search(cmd: &SearchArgs) -> Result<()> {
 
     debug!("Loading queries from {:?}", query_path);
     let queries = read_input(query_path).context("Failed to load queries")?;
-    for (id, sequence) in &queries {
-        opts.seed
-            .resolve(sequence.len())
-            .with_context(|| format!("Invalid seed spec for query '{id}'"))
-            .context("Failed to load queries")?;
-    }
     info!("Loaded {} queries", queries.len());
 
     debug!("Loading target index from {:?}", target_path);

@@ -39,7 +39,7 @@ impl SearchArgs {
         extend.build_alignment = output.format.needs_alignment();
 
         let search = SearchConfig {
-            seed: self.seed.try_into()?,
+            seed: self.seed.into(),
             score: self.score.into(),
             extend,
             filter: self.filter.into(),
