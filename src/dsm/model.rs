@@ -15,7 +15,6 @@ const BASES: [Base; BASE_COUNT] = [Base::Gap, Base::A, Base::C, Base::G, Base::N
 pub struct ScoringModel {
     table: [i32; DSM_FLAT_SIZE],
     initiation: Energy,
-    penalty: Energy,
 }
 
 impl ScoringModel {
@@ -70,11 +69,7 @@ impl ScoringModel {
             );
         }
 
-        Self {
-            table,
-            initiation,
-            penalty,
-        }
+        Self { table, initiation }
     }
 
     /// Convert a total stacking score to binding free energy.
@@ -104,7 +99,6 @@ impl ScoringModel {
         Self {
             table,
             initiation: self.initiation,
-            penalty: self.penalty,
         }
     }
 
