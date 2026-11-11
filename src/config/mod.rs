@@ -197,64 +197,26 @@ impl SeedConfig {
             return Err(Error::Config("query length must be positive".into()));
         }
 
-        match (self.seed_start, self.seed_end) {
-            (None, None) => {
-                let effective_length = self.seed_length.unwrap_or(DEFAULT_SEED_LEN);
-                if effective_length <= 0 {
-                    return Err(Error::Config("Invalid seed length".into()));
-                }
-                let length = effective_length.min(n) as usize;
-                Ok((1, query_len, length))
-            }
-            (Some(start), Some(end)) => {
-                let (s_pos, e_pos) = match (start.signum(), end.signum()) {
-                    (1, 1) if end >= start && end <= n => (start as usize, end as usize),
-                    (-1, -1) if end >= start && start >= -n => {
-                        let to_pos = |v: i64| -> usize {
-                            let x = v + 1;
-                            let r = (x + n) % n;
-                            if r == 0 {
-                                n as usize
-                            } else {
-                                r as usize
-                            }
-                        };
-                        (to_pos(start), to_pos(end))
-                    }
-                    _ => {
-                        return Err(Error::Config(
-                            "Invalid seed interval: outside query bounds".into(),
-                        ))
-                    }
-                };
+        // validate() guarantees: both ends or neither, one sign, start <= end, length fits.
+        let (Some(start), Some(end)) = (self.seed_start, self.seed_end) else {
+            let length = self.seed_length.unwrap_or(DEFAULT_SEED_LEN).min(n) as usize;
+            return Ok((1, query_len, length));
+        };
+        let (s_pos, e_pos) = if start > 0 && end <= n {
+            (start as usize, end as usize)
+        } else if start < 0 && start >= -n {
+            ((start + 1 + n) as usize, (end + 1 + n) as usize)
+        } else {
+            return Err(Error::Config(
+                "Invalid seed interval: outside query bounds".into(),
+            ));
+        };
 
-                if s_pos == 0 || e_pos == 0 {
-                    return Err(Error::Config("Invalid seed interval".into()));
-                }
-
-                let interval_len = e_pos.saturating_sub(s_pos) + 1;
-                if interval_len == 0 {
-                    return Err(Error::Config("Invalid seed interval: empty".into()));
-                }
-
-                let final_len = match self.seed_length {
-                    None => interval_len,
-                    // 0 or negative length explicitly requested -> use full interval
-                    Some(l) if l <= 0 => interval_len,
-                    Some(l) if (l as usize) > interval_len => {
-                        return Err(Error::Config(
-                            "Invalid seed length (exceeds interval)".into(),
-                        ))
-                    }
-                    Some(l) => l as usize,
-                };
-
-                Ok((s_pos, e_pos, final_len))
-            }
-            _ => Err(Error::Config(
-                "use seed_start + seed_end together, or neither".into(),
-            )),
-        }
+        let length = match self.seed_length {
+            Some(length) if length > 0 => length as usize,
+            _ => e_pos - s_pos + 1,
+        };
+        Ok((s_pos, e_pos, length))
     }
 }
 
