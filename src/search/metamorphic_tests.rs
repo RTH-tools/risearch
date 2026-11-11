@@ -13,6 +13,7 @@ use super::test_support::{
     agreement_config, collision_config, no_dedup_config, search, QUERIES, TARGETS, TARGET_RECORDS,
 };
 use super::SearchHit;
+use crate::types::Strand;
 use crate::{SearchConfig, Sequence, TargetRegistry};
 use rstest::rstest;
 use std::collections::HashSet;
@@ -190,5 +191,86 @@ fn stricter_cutoff_returns_exactly_the_eligible_hits(
     assert_eq!(
         strict_keys, expected,
         "cutoff lost eligible hits or retained ineligible hits"
+    );
+}
+
+/// Queries are spread over rayon workers and reach the sink in completion
+/// order, so the worker count must not change which hits are found.
+#[rstest]
+fn worker_count_preserves_named_hits(
+    #[values(
+        SearchConfig::default,
+        agreement_config,
+        collision_config,
+        no_dedup_config
+    )]
+    preset: fn() -> SearchConfig,
+) {
+    let config = preset();
+    let keys_with = |workers: usize| {
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(workers)
+            .build()
+            .unwrap();
+        let hits = pool.install(|| search(&QUERIES, &TARGETS, &config).unwrap());
+        hit_keys(hits, &QUERIES, &TARGETS)
+    };
+
+    let single = keys_with(1);
+    assert!(!single.is_empty(), "corpus must produce hits");
+    assert_eq!(single, keys_with(4), "worker count changed named hits");
+}
+
+/// A target and its reverse complement hold the same two physical strands,
+/// swapped. Every hit must therefore reappear on the other strand, at FASTA
+/// coordinates mirrored within its record.
+#[rstest]
+fn reverse_complemented_targets_mirror_named_hits(
+    #[values(
+        SearchConfig::default,
+        agreement_config,
+        collision_config,
+        no_dedup_config
+    )]
+    preset: fn() -> SearchConfig,
+) {
+    let config = preset();
+    let flipped_records = TARGET_RECORDS
+        .iter()
+        .map(|(name, sequence)| {
+            let flipped: Vec<_> = sequence
+                .iter()
+                .rev()
+                .map(|base| base.complement())
+                .collect();
+            (name.clone(), Sequence::from(flipped))
+        })
+        .collect();
+    let flipped = TargetRegistry::build(flipped_records, Some(NonZeroUsize::MIN)).unwrap();
+
+    let mirrored = search(&QUERIES, &flipped, &config)
+        .unwrap()
+        .into_iter()
+        .map(|mut hit| {
+            let len = TARGET_RECORDS[hit.target_index()].1.len();
+            (hit.t_start, hit.t_end) = (len - 1 - hit.t_end, len - 1 - hit.t_start);
+            hit.strand = match hit.strand {
+                Strand::Forward => Strand::Reverse,
+                Strand::Reverse => Strand::Forward,
+            };
+            hit
+        })
+        .collect();
+
+    let expected = hit_keys(
+        search(&QUERIES, &TARGETS, &config).unwrap(),
+        &QUERIES,
+        &TARGETS,
+    );
+    assert!(!expected.is_empty(), "corpus must produce hits");
+    assert_eq!(
+        hit_keys(mirrored, &QUERIES, &flipped),
+        expected,
+        "reverse complement did not mirror named hits"
     );
 }
