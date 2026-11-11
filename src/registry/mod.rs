@@ -1,8 +1,8 @@
 //! Queries prepared for search.
 //!
 //! [`QueryRegistry`] is built once from normalized records against a
-//! [`SeedConfig`], so each [`Query`] arrives with its seed interval, length
-//! bounds, and N-prefix already resolved.
+//! [`SeedConfig`], so each [`Query`] arrives with its seed interval and length
+//! bounds already resolved.
 
 use crate::error::{Error, Result};
 use rayon::prelude::*;
@@ -12,33 +12,6 @@ use std::ops::{Index, Range};
 use crate::config::SeedConfig;
 use crate::seq::Sequence;
 use crate::types::Base;
-
-#[doc(hidden)]
-pub struct Registry<T> {
-    entries: Vec<T>,
-}
-
-impl<T> Registry<T> {
-    pub fn new(entries: Vec<T>) -> Self {
-        Self { entries }
-    }
-
-    pub(crate) fn len(&self) -> usize {
-        self.entries.len()
-    }
-
-    pub(crate) fn iter(&self) -> impl Iterator<Item = (usize, &T)> {
-        self.entries.iter().enumerate()
-    }
-}
-
-impl<T> Index<usize> for Registry<T> {
-    type Output = T;
-
-    fn index(&self, idx: usize) -> &Self::Output {
-        &self.entries[idx]
-    }
-}
 
 /// Query prepared once at load time for the current seed configuration.
 pub struct Query {
@@ -54,27 +27,11 @@ pub struct Query {
     pub(crate) min_seed_len: usize,
     /// Maximum admissible seed length for this query after normalization.
     pub(crate) max_seed_len: usize,
-    /// Prefix sum of N positions for O(1) N-checking
-    n_prefix: Vec<u32>,
-    /// Fast path when query has no Ns
-    has_n_any: bool,
 }
 
 impl Query {
     fn from_parts(id: String, sequence: Sequence, config: &SeedConfig) -> Result<Self> {
         let q_len = sequence.len();
-
-        // Compute N-prefix for O(1) N-checking
-        let mut n_prefix = Vec::with_capacity(q_len + 1);
-        n_prefix.push(0);
-        let mut n_total = 0;
-        for &base in sequence.iter() {
-            if base == Base::N {
-                n_total += 1;
-            }
-            n_prefix.push(n_total);
-        }
-        let has_n_any = n_total != 0;
 
         // Compute seed interval once and fail early at boundary if invalid.
         let (start1, end1, min_seed_len) = config
@@ -92,8 +49,6 @@ impl Query {
             seed_interval,
             min_seed_len,
             max_seed_len,
-            n_prefix,
-            has_n_any,
         })
     }
 
@@ -110,18 +65,6 @@ impl Query {
     }
 
     #[inline]
-    /// Prefix sums of `N` counts, for O(1) N-free span checks.
-    pub fn n_prefix(&self) -> &[u32] {
-        &self.n_prefix
-    }
-
-    #[inline]
-    /// Whether the sequence contains any `N`.
-    pub fn has_n_any(&self) -> bool {
-        self.has_n_any
-    }
-
-    #[inline]
     /// Normalized seed-interval bounds on the full sequence.
     pub fn seed_interval(&self) -> Range<usize> {
         self.seed_interval.clone()
@@ -132,37 +75,14 @@ impl Query {
     pub fn seed_sequence(&self) -> &[Base] {
         &self.seed_sequence
     }
-
-    /// Map a local position within the seed view to a global query start coordinate.
-    ///
-    /// Returns `None` if the seed overflows the query's seed-search interval,
-    /// violates the query-specific length constraints, or contains an 'N' base.
-    #[inline]
-    pub fn map_seed_pos(&self, local_pos: usize, seed_len: usize) -> Option<usize> {
-        if local_pos + seed_len > self.seed_sequence.len() {
-            return None;
-        }
-
-        if seed_len < self.min_seed_len || seed_len > self.max_seed_len {
-            return None;
-        }
-
-        let query_start = self.seed_interval.start + local_pos;
-
-        if self.has_n_any && self.n_prefix[query_start + seed_len] != self.n_prefix[query_start] {
-            return None;
-        }
-
-        Some(query_start)
-    }
 }
 
 /// Registry of queries. Each `Query` carries its own metadata (sequence, seed
-/// interval, N-prefix); the per-query suffix array used for seeding is built
+/// interval); the per-query suffix array used for seeding is built
 /// on demand inside the seeding worker (see `seed::engine::SeedingEngine::seed_query`),
 /// so the registry holds no combined query SA.
 pub struct QueryRegistry {
-    inner: Registry<Query>,
+    inner: Vec<Query>,
 }
 
 impl QueryRegistry {
@@ -178,7 +98,7 @@ impl QueryRegistry {
 
     /// Iterate `(index, query)` pairs in load order.
     pub fn iter(&self) -> impl Iterator<Item = (usize, &Query)> {
-        self.inner.iter()
+        self.inner.iter().enumerate()
     }
 }
 
@@ -194,8 +114,8 @@ impl QueryRegistry {
     /// Prepare queries from normalized records against `config`; this is what
     /// [`run_search`](crate::run_search) does with its `queries`.
     ///
-    /// Record order is kept and duplicate IDs are rejected. Seed intervals and
-    /// N-prefix sums are resolved in parallel via rayon.
+    /// Record order is kept and duplicate IDs are rejected. Seed intervals are
+    /// resolved in parallel via rayon.
     pub fn build(queries: Vec<(String, Sequence)>, config: &SeedConfig) -> Result<Self> {
         if queries.is_empty() {
             return Err(Error::Input("No query sequences provided".into()));
@@ -215,9 +135,7 @@ impl QueryRegistry {
             .map(|(id, sequence)| Query::from_parts(id, sequence, config))
             .collect::<Result<Vec<_>>>()?;
 
-        Ok(Self {
-            inner: Registry::new(entries),
-        })
+        Ok(Self { inner: entries })
     }
 }
 
@@ -247,9 +165,7 @@ mod tests {
 
     #[test]
     fn query_registry_exposes_the_loaded_queries() {
-        let empty = QueryRegistry {
-            inner: Registry::new(Vec::new()),
-        };
+        let empty = QueryRegistry { inner: Vec::new() };
         assert!(empty.is_empty());
 
         let query = make_query_data(
@@ -258,23 +174,10 @@ mod tests {
             None,
             None,
         );
-        let loaded = QueryRegistry {
-            inner: Registry::new(vec![query]),
-        };
+        let loaded = QueryRegistry { inner: vec![query] };
         assert!(!loaded.is_empty());
         assert_eq!(loaded.len(), 1);
         assert_eq!(loaded[0].name(), "q");
-    }
-
-    #[test]
-    fn has_n_any_is_false_without_an_n() {
-        let clean = make_query_data(
-            Sequence::from(vec![Base::A, Base::C, Base::G]),
-            None,
-            None,
-            None,
-        );
-        assert!(!clean.has_n_any());
     }
 
     #[test]
@@ -347,17 +250,5 @@ mod tests {
     #[test]
     fn build_rejects_no_queries() {
         assert!(QueryRegistry::build(Vec::new(), &seed_config()).is_err());
-    }
-
-    #[test]
-    fn seeds_spanning_an_n_are_rejected() {
-        let sequence = Sequence::from(vec![Base::A, Base::N, Base::G, Base::C]);
-        let query = make_query_data(sequence, None, None, Some(2));
-
-        assert!(query.has_n_any());
-        assert_eq!(query.n_prefix(), &[0, 0, 1, 1, 1]);
-        assert_eq!(query.map_seed_pos(0, 2), None);
-        assert_eq!(query.map_seed_pos(2, 2), Some(2));
-        assert_eq!(query.map_seed_pos(0, 1), None);
     }
 }

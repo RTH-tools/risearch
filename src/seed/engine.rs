@@ -104,7 +104,7 @@ impl<'a> SeedingEngine<'a> {
 
 /// Emit every (query position × target position) seed for one `SeedMatch` of a
 /// single query. Query positions come straight out of the single-query SA and
-/// map back through [`Query::map_seed_pos`]; the target view maps its global
+/// are offset by the seed interval start; the target view maps its global
 /// suffix positions through the index directory.
 ///
 /// Non-maximal seeds are dropped here unless `no_max_prune`: they are shorter
@@ -122,9 +122,7 @@ fn emit_seed_match<const WOBBLE: bool, F: FnMut(SeedHit)>(
     let query_bases = query.sequence();
     let seed_interval = query.seed_interval();
     for &query_sa_pos in query_suffixes.suffix_positions(raw_match.query_interval.clone()) {
-        let Some(query_start) = query.map_seed_pos(query_sa_pos as usize, seed_len) else {
-            continue;
-        };
+        let query_start = seed_interval.start + query_sa_pos as usize;
 
         for &target_sa_pos in tview
             .suffixes()
