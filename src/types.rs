@@ -186,7 +186,7 @@ impl From<Strand> for char {
 
 /// Represents thermodynamic energy, internally stored as an integer (scaling kcal/mol by 10,000).
 /// All conversions from floating-point values expect inputs in kcal/mol.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub struct Energy(pub(crate) i32);
 impl Energy {
     pub(crate) const SCALE: f64 = 10000.0;
@@ -228,18 +228,6 @@ impl TryFrom<f64> for Energy {
 impl From<Energy> for f64 {
     fn from(e: Energy) -> Self {
         e.to_kcal()
-    }
-}
-
-impl PartialOrd for Energy {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for Energy {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.0.cmp(&other.0)
     }
 }
 
