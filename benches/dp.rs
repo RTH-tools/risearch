@@ -1,4 +1,4 @@
-//! Benchmark Gotoh extension over the DP grid: left, right, throughput, repeated extensions
+//! Benchmark Gotoh extension over the DP grid: left, right, repeated extensions
 //!
 //! Run with: cargo bench --bench dp
 
@@ -146,86 +146,6 @@ fn bench_extend_right(c: &mut Criterion) {
     group.finish();
 }
 
-/// Throughput benchmark: measure DP cells computed per second.
-fn bench_throughput(c: &mut Criterion) {
-    let mut group = c.benchmark_group("throughput");
-    group.sample_size(10); // Smaller sample size for realistic wall-clock time
-    let (init, source) = DsmRegistry::load(&DsmId::from("t04"), 37).unwrap();
-    let model = ScoringModel::new(&source, init, Energy::from_kcal(0.0));
-    let left_model = model.transpose();
-    let gotoh_right = Gotoh::new(&model);
-    let gotoh_left = Gotoh::new(&left_model);
-
-    for len in [10, 20, 30, 50].iter() {
-        // Left extension throughput: query_len × target_len DP cells
-        group.bench_with_input(
-            BenchmarkId::new("extend_left_cells", len),
-            len,
-            |b, &len| {
-                let query = generate_ranks(100, 12345);
-                let target = generate_ranks(100, 54321);
-
-                let mut grid = DpGrid::new(200);
-                let mut q_buf = [0u8; 256];
-                let mut t_buf = [0u8; 256];
-
-                b.iter_custom(|iters| {
-                    let mut total_duration = std::time::Duration::ZERO;
-
-                    for _ in 0..iters {
-                        let start = std::time::Instant::now();
-                        let q_len = load(&mut q_buf, black_box(&query[..len]));
-                        let t_len = load(&mut t_buf, black_box(&target[..len]));
-                        let result = gotoh_left.extend(&q_buf[..q_len], &t_buf[..t_len], &mut grid);
-                        total_duration += start.elapsed();
-
-                        // Ensure result is not optimized away
-                        black_box(result);
-                    }
-
-                    total_duration
-                });
-            },
-        );
-
-        // Right extension throughput: query_len × target_len DP cells
-        group.bench_with_input(
-            BenchmarkId::new("extend_right_cells", len),
-            len,
-            |b, &len| {
-                let query = generate_ranks(100, 12345);
-                let target = generate_ranks(100, 54321);
-                let q_end = 49;
-                let t_end = 49;
-
-                let mut grid = DpGrid::new(200);
-                let mut q_buf = [0u8; 256];
-                let mut t_buf = [0u8; 256];
-
-                b.iter_custom(|iters| {
-                    let mut total_duration = std::time::Duration::ZERO;
-
-                    for _ in 0..iters {
-                        let start = std::time::Instant::now();
-                        let q_len = load(&mut q_buf, black_box(from(&query, q_end, len)));
-                        let t_len = load(&mut t_buf, black_box(from(&target, t_end, len)));
-                        let result =
-                            gotoh_right.extend(&q_buf[..q_len], &t_buf[..t_len], &mut grid);
-                        total_duration += start.elapsed();
-
-                        // Ensure result is not optimized away
-                        black_box(result);
-                    }
-
-                    total_duration
-                });
-            },
-        );
-    }
-
-    group.finish();
-}
-
 /// Many extensions benchmark: simulates a search workload with 100 extensions.
 /// Each extension pair (left + right) is a typical search seed extension pattern.
 fn bench_many_extensions(c: &mut Criterion) {
@@ -296,7 +216,6 @@ criterion_group!(
     benches,
     bench_extend_left,
     bench_extend_right,
-    bench_throughput,
     bench_many_extensions
 );
 criterion_main!(benches);
